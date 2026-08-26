@@ -1,8 +1,10 @@
-import type { Action } from '../actions/schema.ts';
+import { ActionSchema, type Action } from '../actions/schema.ts';
+import type { LlmClient } from '../llm/client.ts';
+import { ACTION_JSON_SCHEMA, buildSystemPrompt, buildUserPrompt } from './prompt.ts';
 import type { Goal } from '../goals/schema.ts';
 import type { Persona } from '../personas/schema.ts';
 import type { Observation } from '../observations/types.ts';
-import type { Result } from '../types/shared.ts';
+import { err, ok, type Result } from '../types/shared.ts';
 
 /**
  * The planner interface.
@@ -46,3 +48,65 @@ export type PlannerInput = {
  * exception that ends the run without evidence.
  */
 export type Planner = (input: PlannerInput) => Promise<Result<Action, string>>;
+
+/**
+ * The production planner: prompt the model, then validate hard.
+ *
+ * The model's answer is untrusted input. It is asked for a particular shape,
+ * but what it actually returns is parsed against the Zod schema before it can
+ * affect anything — the request format is a convenience, not a guarantee.
+ *
+ * A validation failure is retried once with the errors fed back, because models
+ * usually fix a schema mistake when shown it. After that the step is recorded
+ * as a planner failure and the loop decides what to do; it is never silently
+ * coerced into some nearby action we invented on the model's behalf.
+ */
+export function createModelPlanner(options: {
+  readonly client: LlmClient;
+  readonly model: string;
+  readonly maxSchemaRetries?: number;
+}): Planner {
+  const maxSchemaRetries = options.maxSchemaRetries ?? 1;
+
+  return async (input) => {
+    const system = buildSystemPrompt(input);
+    let user = buildUserPrompt(input);
+
+    for (let attempt = 0; attempt <= maxSchemaRetries; attempt++) {
+      const response = await options.client.completeJson({
+        model: options.model,
+        system,
+        user,
+        schemaName: 'customer_action',
+        jsonSchema: ACTION_JSON_SCHEMA as unknown as Record<string, unknown>,
+      });
+
+      if (!response.ok) return err(response.error);
+
+      const envelope = response.value;
+      const decision =
+        envelope !== null && typeof envelope === 'object' && 'decision' in envelope
+          ? (envelope as { decision: unknown }).decision
+          : envelope;
+
+      const parsed = ActionSchema.safeParse(decision);
+      if (parsed.success) return ok(parsed.data);
+
+      const issues = parsed.error.issues
+        .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+        .join('; ');
+
+      if (attempt === maxSchemaRetries) {
+        return err(`The model's action did not validate: ${issues}`);
+      }
+
+      user = `${buildUserPrompt(input)}
+
+Your previous answer could not be used: ${issues}
+Answer again, using only the allowed action shapes and only refs listed above.`;
+    }
+
+    // Unreachable: the loop above always returns.
+    return err('The planner produced no answer.');
+  };
+}

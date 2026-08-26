@@ -51,6 +51,8 @@ export type LoopOptions = {
   readonly redact: Redactor;
   readonly logger: Logger;
   readonly limits?: Limits;
+  /** Set false only for a run explicitly authorised to make real changes. */
+  readonly blockDestructive?: boolean;
   /** Screenshot hook. Returns the saved path, or null. */
   readonly capture?: (stepIndex: number) => Promise<string | null>;
   readonly settleTimeoutMs?: number;
@@ -177,6 +179,7 @@ export async function runLoop(options: LoopOptions): Promise<SessionRecord> {
         currentGeneration: generation,
         secrets: options.secrets,
         takeBlockedNavigations: session.takeBlockedNavigations,
+        blockDestructive: options.blockDestructive !== false,
         now,
       });
 
