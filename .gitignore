@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit a real .env (.env.example IS committed)
+.env
+.env.*
+!.env.example
+
+# Session records, screenshots and artifacts (may contain sensitive data)
+data/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test / tooling output
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+.vitest/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch
+tmp/
+scratch/

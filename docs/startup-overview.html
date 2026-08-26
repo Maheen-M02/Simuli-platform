@@ -1,0 +1,584 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>AI Customer Simulation — Founder Briefing</title>
+<style>
+@page { size: A4; margin: 16mm 14mm 14mm 14mm; }
+* { box-sizing: border-box; }
+body { font-family: Georgia, "Times New Roman", serif; color: #23262e; font-size: 10.4pt; line-height: 1.52; margin: 0; }
+h1,h2,h3,.sans { font-family: "Segoe UI", Arial, sans-serif; }
+h2 { font-size: 14.5pt; color: #1e2a5a; margin: 24px 0 8px; padding-bottom: 5px; border-bottom: 2px solid #dfe3ee; page-break-after: avoid; }
+h2 .num { color: #8a93b0; font-weight: 500; margin-right: 8px; }
+h3 { font-size: 11.2pt; color: #2b3040; margin: 15px 0 5px; page-break-after: avoid; }
+h4 { font-family:"Segoe UI",Arial,sans-serif; font-size: 9.6pt; color: #1e2a5a; margin: 12px 0 3px; page-break-after: avoid; }
+p { margin: 7px 0; }
+ul, ol { margin: 7px 0; padding-left: 19px; }
+li { margin: 3.5px 0; }
+.cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+.cover .eyebrow { font-family:"Segoe UI",Arial,sans-serif; letter-spacing: 2.4px; text-transform: uppercase; font-size: 9pt; color: #6b7391; }
+.cover h1 { font-size: 33pt; line-height: 1.15; color: #1e2a5a; margin: 14px 0 0; letter-spacing: -0.5px; }
+.cover .tag { font-size: 15pt; font-style: italic; color: #4a5170; margin-top: 18px; }
+.cover .rule { width: 70px; height: 4px; background: #1e2a5a; margin: 26px 0; }
+.cover .meta { font-family:"Segoe UI",Arial,sans-serif; font-size: 9.5pt; color: #6b7391; line-height: 1.9; }
+.toc { font-family:"Segoe UI",Arial,sans-serif; font-size: 9.3pt; color: #4a5170; line-height: 1.75; margin-top: 30px; column-count: 2; column-gap: 26px; }
+.toc b { color: #1e2a5a; }
+.lede { font-size: 11.8pt; color: #333a4d; border-left: 4px solid #1e2a5a; padding: 4px 0 4px 14px; margin: 12px 0 16px; }
+table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9.4pt; page-break-inside: avoid; }
+th { font-family:"Segoe UI",Arial,sans-serif; text-align: left; background: #eef1f8; color: #1e2a5a; padding: 6px 8px; font-size: 8.9pt; border-bottom: 1.5px solid #c9d0e4; }
+td { padding: 6px 8px; border-bottom: 1px solid #e4e7f0; vertical-align: top; }
+tr:nth-child(even) td { background: #fafbfe; }
+table.tight { font-size: 8.7pt; }
+table.tight th, table.tight td { padding: 4.5px 6px; }
+.num-cell { font-family:"Segoe UI",Arial,sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.box { background: #f6f8fd; border: 1px solid #dbe1f0; border-radius: 5px; padding: 11px 14px; margin: 11px 0; page-break-inside: avoid; }
+.box.warn { background: #fdf7f0; border-color: #ecd8bd; }
+.box.good { background: #f2f9f4; border-color: #cbe4d2; }
+.box.dark { background: #1e2a5a; border-color:#1e2a5a; color: #eef1f8; }
+.box.dark .lbl { color: #a9b4d8; }
+.box.dark strong { color: #fff; }
+.box .lbl { font-family:"Segoe UI",Arial,sans-serif; font-size: 8.3pt; letter-spacing: 1.3px; text-transform: uppercase; color: #6b7391; display: block; margin-bottom: 5px; }
+.flow { margin: 13px auto; width: 74%; page-break-inside: avoid; }
+.flow .s { border: 1.5px solid #c3cbe4; background: #fff; border-radius: 5px; padding: 7px 12px; text-align: center; font-family:"Segoe UI",Arial,sans-serif; font-size: 9.4pt; }
+.flow .s b { color: #1e2a5a; display:block; font-size: 9.9pt; }
+.flow .s span { color: #5d6480; font-size: 8.7pt; }
+.flow .a { text-align: center; color: #8a93b0; font-size: 13pt; line-height: 1.1; margin: 3px 0; }
+.flow .loop { text-align:center; font-family:"Segoe UI",Arial,sans-serif; font-size:8.5pt; color:#6b7391; font-style:italic; margin-top:6px; }
+.two { display: flex; gap: 13px; }
+.two > div { flex: 1; }
+.three { display: flex; gap: 11px; }
+.three > div { flex: 1; }
+.stat { text-align:center; border:1px solid #dbe1f0; border-radius:5px; padding:10px 6px; background:#fafbfe; }
+.stat .big { font-family:"Segoe UI",Arial,sans-serif; font-size: 17pt; color:#1e2a5a; font-weight:600; display:block; line-height:1.1; }
+.stat .cap { font-family:"Segoe UI",Arial,sans-serif; font-size: 8.1pt; color:#5d6480; display:block; margin-top:5px; line-height:1.35; }
+.report { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; background: #fbfcfe; border: 1px solid #dbe1f0; border-left: 4px solid #1e2a5a; border-radius: 4px; padding: 11px 13px; white-space: pre-wrap; line-height: 1.48; page-break-inside: avoid; }
+.pill { font-family:"Segoe UI",Arial,sans-serif; font-size: 8.1pt; padding: 2px 7px; border-radius: 9px; background: #e6eaf6; color: #1e2a5a; white-space: nowrap; }
+.pill.no { background: #f7e6e6; color: #8a2f2f; }
+.pill.yes { background: #e2f0e6; color: #2a6136; }
+.kicker { font-family:"Segoe UI",Arial,sans-serif; font-size: 9.3pt; color: #6b7391; margin: -4px 0 10px; }
+.pagebreak { page-break-before: always; }
+.foot { margin-top: 26px; padding-top: 9px; border-top: 1px solid #dfe3ee; font-family:"Segoe UI",Arial,sans-serif; font-size: 8.6pt; color: #8a93b0; }
+strong { color: #1a1d24; }
+sup { font-size: 7.2pt; color: #5a6ba8; font-family:"Segoe UI",Arial,sans-serif; }
+/* funnel */
+.funnel { margin: 12px auto 4px; width: 92%; page-break-inside: avoid; }
+.funnel .lvl { margin: 0 auto 5px; color: #fff; font-family:"Segoe UI",Arial,sans-serif; text-align:center; padding: 8px 10px; border-radius: 4px; }
+.funnel .lvl b { display:block; font-size: 10.5pt; }
+.funnel .lvl span { font-size: 8.3pt; opacity: .92; }
+.funnel sup, .box.dark sup { color: rgba(255,255,255,.8); }
+.f1 { background:#1e2a5a; width:100%; }
+.f2 { background:#3a4a86; width:74%; }
+.f3 { background:#5d6faf; width:50%; }
+.f4 { background:#8a99cc; width:30%; }
+/* business model canvas */
+.bmc { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: auto auto; gap: 4px; margin: 10px 0 4px; page-break-inside: avoid; }
+.bmc .c { border: 1px solid #c9d0e4; border-radius: 4px; padding: 6px 7px; background: #fff; font-family:"Segoe UI",Arial,sans-serif; font-size: 7.4pt; line-height: 1.42; }
+.bmc .c h5 { margin: 0 0 4px; font-size: 7.5pt; color: #1e2a5a; letter-spacing: .4px; text-transform: uppercase; border-bottom: 1px solid #e4e7f0; padding-bottom: 3px; }
+.bmc .c ul { margin: 0; padding-left: 11px; }
+.bmc .c li { margin: 2.5px 0; }
+.bmc .kp { grid-column: 1; grid-row: 1 / span 2; }
+.bmc .ka { grid-column: 2; grid-row: 1; }
+.bmc .kr { grid-column: 2; grid-row: 2; }
+.bmc .vp { grid-column: 3; grid-row: 1 / span 2; background: #f6f8fd; border-color: #1e2a5a; border-width: 1.5px; }
+.bmc .cr { grid-column: 4; grid-row: 1; }
+.bmc .ch { grid-column: 4; grid-row: 2; }
+.bmc .cs { grid-column: 5; grid-row: 1 / span 2; background:#f6f8fd; }
+.bmc2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; page-break-inside: avoid; }
+.bmc2 .c { border: 1px solid #c9d0e4; border-radius: 4px; padding: 6px 7px; background: #fff; font-family:"Segoe UI",Arial,sans-serif; font-size: 7.4pt; line-height: 1.42; }
+.bmc2 .c h5 { margin: 0 0 4px; font-size: 7.5pt; color: #1e2a5a; letter-spacing: .4px; text-transform: uppercase; border-bottom: 1px solid #e4e7f0; padding-bottom: 3px; }
+.bmc2 .c ul { margin: 0; padding-left: 11px; } .bmc2 .c li { margin: 2.5px 0; }
+.srcs { font-family:"Segoe UI",Arial,sans-serif; font-size: 7.8pt; color: #4a5170; line-height: 1.55; }
+.srcs li { margin: 3px 0; }
+.srcs span { color:#8a93b0; word-break: break-all; }
+</style></head><body>
+
+<div class="cover">
+  <div class="eyebrow">Founder Briefing &nbsp;&middot;&nbsp; Internal</div>
+  <h1>AI Customer<br>Simulation</h1>
+  <div class="rule"></div>
+  <div class="tag">"Your AI customer base<br>before your real customer base."</div>
+  <div style="height:26px"></div>
+  <div class="meta">
+    <strong>What this document is:</strong> a plain-English explanation of what we are building,<br>
+    the market, who we are up against, how we make money, and what we build first.<br><br>
+    Prepared for co-founder review &nbsp;&middot;&nbsp; 25 August 2026<br>
+    Status: architecture agreed &middot; implementation not yet started
+  </div>
+  <div class="toc">
+    <b>1.</b> The idea in one sentence<br>
+    <b>2.</b> The problem we are solving<br>
+    <b>3.</b> What we are building<br>
+    <b>4.</b> A concrete example<br>
+    <b>5.</b> Why this is not automated testing<br>
+    <b>6.</b> What the customer receives<br>
+    <b>7.</b> Market research and sizing<br>
+    <b>8.</b> Business model canvas<br>
+    <b>9.</b> The competitor landscape<br>
+    <b>10.</b> Where we beat them<br>
+    <b>11.</b> Pricing and revenue estimates<br>
+    <b>12.</b> Go-to-market<br>
+    <b>13.</b> What we build first (V0)<br>
+    <b>14.</b> How it works under the hood<br>
+    <b>15.</b> What we build it with<br>
+    <b>16.</b> Safety rules<br>
+    <b>17.</b> The honest risks<br>
+    <b>18.</b> Roadmap<br>
+    <b>19.</b> Open questions for us two<br>
+    <b>20.</b> Sources
+  </div>
+</div>
+
+<h2><span class="num">1</span>The Idea in One Sentence</h2>
+<p class="lede">We let a software company test their product on <strong>realistic AI customers</strong> &mdash; before a single real customer ever sees it.</p>
+<p>A company gives us four things: the link to their product, a test login, a description of who their customer is, and something that customer should be able to do. We put an AI "customer" into a real web browser and let it try. Then we tell them exactly what that customer experienced &mdash; where they got confused, where they got stuck, and what to fix.</p>
+
+<h2><span class="num">2</span>The Problem We Are Solving</h2>
+<p>Most software companies lose the majority of new sign-ups within the first ten minutes. The person opens the product, doesn't understand what to do, and leaves. They never write in to complain &mdash; they just disappear.</p>
+<p>The company knows <em>that</em> it happened. It almost never knows <em>why</em>.</p>
+<div class="three" style="margin:12px 0">
+  <div class="stat"><span class="big">8.9%</span><span class="cap">Average free-trial-to-paid conversion when no credit card is required<sup>[11]</sup></span></div>
+  <div class="stat"><span class="big">54%</span><span class="cap">Median share of trial users who ever reach the product's "aha" moment<sup>[11]</sup></span></div>
+  <div class="stat"><span class="big">44.7%</span><span class="cap">Drop in sign-up abandonment from one fix: cutting a form from 7 fields to 3<sup>[11]</sup></span></div>
+</div>
+<p>That last number is the whole business in miniature. A single, small, <em>findable</em> problem was costing nearly half the funnel. Someone eventually found it. The question is how much revenue leaked out before they did.</p>
+<table>
+  <tr><th style="width:25%">What they use today</th><th style="width:36%">What it tells them</th><th>Why it isn't enough</th></tr>
+  <tr><td><strong>Analytics</strong><br>(Mixpanel, Amplitude)</td><td>60% of users drop off on step 3.</td><td>Tells you <em>where</em>, never <em>why</em>. You are left guessing.</td></tr>
+  <tr><td><strong>Session recordings</strong><br>(Hotjar, FullStory)</td><td>Video of a real person struggling.</td><td>Only exists <em>after</em> you already lost that customer. And someone has to watch hours of it.</td></tr>
+  <tr><td><strong>User interviews</strong></td><td>Deep insight from 5&ndash;10 people.</td><td>Slow, expensive, hard to schedule, rarely repeatable every release.</td></tr>
+  <tr><td><strong>QA / automated tests</strong></td><td>The buttons work.</td><td>Checks whether the software <em>functions</em>, never whether a human <em>understands</em> it.</td></tr>
+</table>
+<p>There is a gap in the middle, and it is a big one: <strong>nobody tests whether a specific kind of real person can actually figure the product out</strong> &mdash; cheaply, repeatedly, and before launch. That gap is our product.</p>
+
+<h2><span class="num">3</span>What We Are Building</h2>
+<div class="two">
+  <div class="box"><span class="lbl">The company gives us</span>
+    <ul style="margin:0;padding-left:16px">
+      <li>A link to their product</li>
+      <li>A test login</li>
+      <li>Who their customer is</li>
+      <li>What that customer should achieve</li>
+    </ul>
+  </div>
+  <div class="box good"><span class="lbl">We give them back</span>
+    <ul style="margin:0;padding-left:16px">
+      <li>Did the customer succeed?</li>
+      <li>Where they struggled, and why</li>
+      <li>A recording of every step</li>
+      <li>A ranked list of what to fix</li>
+    </ul>
+  </div>
+</div>
+<p>In between, our AI takes on a <strong>persona</strong> &mdash; a specific type of customer &mdash; opens the product in a real browser, and tries to get the job done the way that person would. It is not following a script. It looks at the screen, decides what a person like that would do next, does it, sees what happened, and continues.</p>
+
+<h2><span class="num">4</span>A Concrete Example</h2>
+<div class="box"><span class="lbl">The persona</span>
+  "An Indian small-business owner. Not technical. Has never used accounting software before. Busy, impatient, will give up if confused."
+  <div style="height:8px"></div><span class="lbl">The goal</span>
+  "Create an account, finish the setup, and send your first invoice."
+</div>
+<ol>
+  <li>Lands on the homepage, looks for how to sign up, clicks <strong>"Start free trial"</strong>.</li>
+  <li>Fills in the sign-up form. Hits a password rule it wasn't told about upfront. Retries.</li>
+  <li>Reaches a setup wizard asking for "GSTIN" and "default ledger account". <em>Doesn't know what a ledger account is.</em> Looks for help. Finds none. Guesses.</li>
+  <li>Reaches the dashboard. Looks for "create invoice". The button is called <strong>"New Document"</strong>. Takes four clicks to find it.</li>
+  <li>Fills the invoice. Clicks Save. The page clears with no confirmation &mdash; <em>it isn't clear whether it worked</em>.</li>
+  <li>Gives up, unsure if the invoice was created.</li>
+</ol>
+<p>Every one of those moments is a real reason a real customer leaves. The company gets all six, with a screenshot of each, within minutes of asking.</p>
+
+<h2 class="pagebreak"><span class="num">5</span>Why This Is Not Just "Automated Testing"</h2>
+<p class="kicker">This distinction is the whole business. It is worth being precise about it.</p>
+<table>
+  <tr><th style="width:50%">Traditional QA / test automation</th><th>What we do</th></tr>
+  <tr><td>Asks: <strong>"Does this workflow still work?"</strong></td><td>Asks: <strong>"Can a real customer succeed here &mdash; and what do they feel on the way?"</strong></td></tr>
+  <tr><td>Someone writes the exact steps in advance.</td><td>Nobody writes the steps. The AI works them out, like a person would.</td></tr>
+  <tr><td>Passes if the buttons respond.</td><td>Fails if a human would have been confused, even when everything technically works.</td></tr>
+  <tr><td>Breaks the moment the UI changes.</td><td>Adapts &mdash; it is looking at the screen, not at a saved list of instructions.</td></tr>
+  <tr><td>Output: a green tick or a red cross.</td><td>Output: a customer-experience report with evidence.</td></tr>
+  <tr><td>Bought by <strong>engineering</strong>.</td><td>Bought by <strong>product, growth and founders</strong>.</td></tr>
+</table>
+<div class="box warn"><span class="lbl">The key insight</span>A product can pass every QA test ever written and still lose 70% of its sign-ups. QA tests the <strong>software</strong>. We test the <strong>experience</strong>. Those are different products, with different buyers and different budgets.</div>
+
+<h2><span class="num">6</span>What the Customer Actually Receives</h2>
+<div class="report">OUTCOME:        FAILURE &mdash; goal not completed
+STEPS TAKEN:    17          TIME: 4 min 12 sec
+
+WHAT WENT WRONG
+  [HIGH]   Setup asks for "default ledger account" with no explanation.
+           A non-accountant cannot answer this. Blocked here for 3 steps.
+           &rarr; Cause: PRODUCT PROBLEM        (screenshot: step 6)
+
+  [HIGH]   No confirmation shown after saving an invoice. The customer
+           could not tell whether it worked, and gave up.
+           &rarr; Cause: PRODUCT PROBLEM        (screenshot: step 16)
+
+  [MEDIUM] "Create invoice" is labelled "New Document". Took 4 clicks
+           to find what should take 1.
+           &rarr; Cause: PRODUCT PROBLEM        (screenshot: step 12)
+
+RECOMMENDATIONS
+  1. Explain or remove the "ledger account" question for new users.
+  2. Show a clear success message after saving an invoice.
+  3. Rename "New Document" to "New Invoice".</div>
+<div class="box"><span class="lbl">The part that makes this trustworthy</span>
+Every finding is labelled with a <strong>cause</strong>. The system must always classify each problem as one of three things:
+<ul style="margin:6px 0 0;padding-left:16px">
+<li><span class="pill">PRODUCT PROBLEM</span> &mdash; the product genuinely confused the customer. <em>This is what we sell.</em></li>
+<li><span class="pill no">AI LIMITATION</span> &mdash; our AI was the one that misunderstood; a real person would not have.</li>
+<li><span class="pill no">TECHNICAL FAILURE</span> &mdash; our browser or tooling broke. Not the customer's fault, and not the product's.</li>
+</ul>
+<div style="height:6px"></div>If we blur these three together, our reports become noise and nobody trusts them. Keeping them separate &mdash; and honestly reporting our own failures &mdash; is what makes this a credible business rather than a demo. <strong>As far as we can tell from public material, no competitor does this.</strong></div>
+
+<h2 class="pagebreak"><span class="num">7</span>Market Research and Sizing</h2>
+<p class="kicker">All figures below are from public research reports, cited at the end. Treat market-size numbers as directional &mdash; different firms disagree by several times over.</p>
+
+<h3>The markets we sit between</h3>
+<table>
+  <tr><th style="width:34%">Market</th><th class="num-cell" style="width:15%">2026 size</th><th class="num-cell" style="width:17%">Forecast</th><th>Relevance to us</th></tr>
+  <tr><td><strong>Usability testing software</strong></td><td class="num-cell">$1.84B<sup>[2]</sup></td><td class="num-cell">$9.44B by 2034<br>(19.9% CAGR)</td><td>Our home category. Fast-growing and being reshaped by AI right now.</td></tr>
+  <tr><td><strong>User research &amp; testing software</strong></td><td class="num-cell">$2.03B<sup>[3]</sup></td><td class="num-cell">$4.28B by 2035<br>(8.7% CAGR)</td><td>The budget line our buyer already owns.</td></tr>
+  <tr><td><strong>UX research software</strong> (narrow)</td><td class="num-cell">$520M<sup>[1]</sup></td><td class="num-cell">$1.25B by 2034<br>(11.6% CAGR)</td><td>The conservative reading of our category.</td></tr>
+  <tr><td><strong>AI-powered software testing &amp; QA</strong></td><td class="num-cell">$11.99B<sup>[4]</sup></td><td class="num-cell">$39.4B by 2031<br>(26.9% CAGR)</td><td>The adjacent market we can expand into later &mdash; and where the money currently is.</td></tr>
+</table>
+
+<h3>From market size to what we could realistically earn</h3>
+<div class="funnel">
+  <div class="lvl f1"><b>TAM &mdash; $1.8B today, $9.4B by 2034</b><span>All spending on usability &amp; experience testing software worldwide<sup>[2]</sup></span></div>
+  <div class="lvl f2"><b>SAM &mdash; roughly $200M&ndash;$600M</b><span>~33,200 SaaS companies worldwide<sup>[6]</sup>, of which perhaps 15,000 are mature enough to buy, at $6k&ndash;$15k/year</span></div>
+  <div class="lvl f3"><b>Beachhead &mdash; roughly $60M</b><span>Seed to Series&nbsp;B B2B SaaS with a self-serve sign-up funnel, English-language, ~8,000 companies</span></div>
+  <div class="lvl f4"><b>SOM &mdash; $3M&ndash;$5M ARR in 3 years</b><span>What we think we can actually capture. See section 11.</span></div>
+</div>
+<p style="font-size:9.3pt;color:#5d6480"><em>How the SAM number is built:</em> 33,200 SaaS companies worldwide<sup>[6]</sup>; assume ~45% are past seed stage and have someone whose job includes the sign-up funnel (~15,000); at an average $8k/year that is ~$120M, and up to ~$600M if we also count e-commerce checkouts, marketplaces and agencies, all of which have the same problem.</p>
+
+<h3>Why now, and not two years ago</h3>
+<ul>
+  <li><strong>The technology only just became possible.</strong> AI agents that can reliably look at a screen, decide, and click became usable in the last 18 months. Before that, this product could not be built.</li>
+  <li><strong>The money has arrived.</strong> Over <strong>$1.5B of venture capital</strong> has gone into AI testing platforms, with 40+ startups now competing<sup>[5]</sup>. That validates the space &mdash; and warns us the window is not wide open forever.</li>
+  <li><strong>Buyers are already asking for it.</strong> In Maze's industry survey, around <strong>half of UX researchers</strong> named synthetic (AI) users as one of the biggest trends of 2026<sup>[12]</sup>. We don't have to educate the market on the concept, only convince them ours works.</li>
+  <li><strong>Teams got smaller, products didn't.</strong> Fewer dedicated researchers and QA staff, same expectation to ship weekly. Something has to fill the gap.</li>
+</ul>
+<div class="box warn"><span class="lbl">The honest counterweight</span>A crowded, well-funded market means we are not early. We are entering a race already underway. Our advantage cannot be "we thought of it" &mdash; it has to be that we do a specific thing better. Section 10 is the most important page in this document.</div>
+
+<h2 class="pagebreak"><span class="num">8</span>Business Model Canvas</h2>
+<div class="bmc">
+  <div class="c kp"><h5>Key Partners</h5><ul>
+    <li>AI model providers (OpenAI today; alternatives later to protect margin)</li>
+    <li>Cloud browser infrastructure providers, once we run at scale</li>
+    <li>Product &amp; design agencies &mdash; they resell to their clients</li>
+    <li>Accelerators and founder communities (YC, SaaSBoomi) for distribution</li>
+    <li>Disposable-inbox providers, needed for sign-up flows</li>
+  </ul></div>
+  <div class="c ka"><h5>Key Activities</h5><ul>
+    <li>Improving how well the AI reads real screens &mdash; our core engineering problem</li>
+    <li>Making personas behave believably</li>
+    <li>Measuring and improving report accuracy</li>
+    <li>Publishing free public teardowns as marketing</li>
+    <li>Design-partner support</li>
+  </ul></div>
+  <div class="c kr"><h5>Key Resources</h5><ul>
+    <li>The agent runtime</li>
+    <li>A growing library of recorded sessions and recurring friction patterns &mdash; compounding, hard to copy</li>
+    <li>Our accuracy benchmark</li>
+    <li>A very small engineering team</li>
+  </ul></div>
+  <div class="c vp"><h5>Value Proposition</h5><ul>
+    <li><strong>Know why customers drop off before you lose them</strong>, not months after</li>
+    <li><strong>100 customer journeys in an hour</strong> instead of 5 interviews in three weeks</li>
+    <li><strong>Every finding is evidence-linked and replayable</strong> &mdash; you can watch it happen</li>
+    <li><strong>We tell you when it was our AI's fault</strong>, not your product's</li>
+    <li><strong>Runs every release</strong> &mdash; experience regression testing, not a one-off study</li>
+    <li>A fraction of the price of human panels</li>
+  </ul></div>
+  <div class="c cr"><h5>Customer Relationships</h5><ul>
+    <li>Self-serve sign-up, no sales call needed</li>
+    <li>Free teardown report as the first touch</li>
+    <li>Founder-led sales for the first ~30 customers</li>
+    <li>Shared Slack channel with design partners</li>
+    <li>Automated reports delivered into their workflow</li>
+  </ul></div>
+  <div class="c ch"><h5>Channels</h5><ul>
+    <li>Our own website, self-serve</li>
+    <li>Public teardowns of well-known products (content + SEO engine)</li>
+    <li>LinkedIn / X founder audience</li>
+    <li>Accelerator and community partnerships</li>
+    <li>Agencies as resellers</li>
+  </ul></div>
+  <div class="c cs"><h5>Customer Segments</h5>
+    <div style="font-size:7.2pt;color:#1e2a5a;font-weight:600;margin-bottom:2px">BEACHHEAD</div><ul>
+    <li>Seed&ndash;Series B B2B SaaS, 10&ndash;150 people, with a self-serve sign-up</li>
+    <li>Buyer: founder, Head of Product or Head of Growth</li>
+    <li>Pain: they know the funnel leaks, cannot afford research staff</li></ul>
+    <div style="font-size:7.2pt;color:#1e2a5a;font-weight:600;margin:5px 0 2px">EXPAND LATER</div><ul>
+    <li>Mid-market SaaS product teams</li>
+    <li>E-commerce checkout flows</li>
+    <li>Digital agencies</li>
+    <li>Enterprise digital experience teams</li></ul>
+  </div>
+</div>
+<div class="bmc2">
+  <div class="c"><h5>Cost Structure</h5><ul>
+    <li><strong>Engineering salaries</strong> &mdash; by far the largest cost in years 1&ndash;2, and mostly fixed</li>
+    <li><strong>AI model usage</strong> &mdash; our main variable cost; roughly $0.20&ndash;$0.60 per simulation today, falling over time</li>
+    <li><strong>Browser compute</strong> &mdash; a few cents per simulation</li>
+    <li><strong>Storage</strong> for screenshots and recordings &mdash; small but grows</li>
+    <li><strong>Go-to-market</strong> &mdash; mostly content and time, little paid spend</li>
+    <li>Structurally: high fixed cost, low variable cost, so margins improve sharply with scale</li>
+  </ul></div>
+  <div class="c"><h5>Revenue Streams</h5><ul>
+    <li><strong>Monthly subscription</strong>, tiered by number of simulations &mdash; the main line</li>
+    <li><strong>Usage overage</strong> when customers exceed their tier</li>
+    <li><strong>Annual enterprise contracts</strong> with security review, SSO and private deployment (year 2+)</li>
+    <li><strong>Paid one-off audit reports</strong> ($500&ndash;$2,000) &mdash; early cash, and the best lead generator we have</li>
+    <li><strong>Continuous monitoring add-on</strong> &mdash; runs on every release; this is the sticky, recurring version (year 3)</li>
+  </ul></div>
+</div>
+
+<h2 class="pagebreak"><span class="num">9</span>The Competitor Landscape</h2>
+<p class="kicker">There are direct competitors. We should be clear-eyed about that from day one.</p>
+
+<h3>Six groups of competitors</h3>
+<table class="tight">
+  <tr><th style="width:16%">Group</th><th style="width:26%">Who</th><th style="width:29%">What they do</th><th>Why they don't fully solve it</th></tr>
+  <tr><td><strong>A. Human panel testing</strong></td><td>UserTesting, Maze, Lyssna, UserZoom, PlaybookUX</td><td>Recruit real humans to try your product on video</td><td>Real insight, but slow, expensive and not repeatable per release. UserTesting averages <strong>$36k/yr for SMBs and $148k/yr for enterprises</strong><sup>[7]</sup></td></tr>
+  <tr><td><strong>B. Synthetic user research</strong></td><td>Synthetic Users, Minds, Evidenza, Simile, Lakmoos, Aaru, Maze Synthetic Users</td><td>Ask an AI persona what it <em>thinks</em> about your product or concept<sup>[15]</sup></td><td><strong>They never touch the product.</strong> It is an LLM's opinion of a description &mdash; no clicking, no real screens, no real friction</td></tr>
+  <tr><td><strong>C. AI usability agents</strong> <em>(closest to us)</em></td><td>Uxia, and parts of Spur</td><td>AI testers navigate prototypes and live sites, then report friction<sup>[13]</sup></td><td>Uxia leans towards prototypes and enterprise "book a demo" pricing; the honesty problem (section 10) is unaddressed</td></tr>
+  <tr><td><strong>D. Autonomous AI QA</strong></td><td>Spur, Momentic, Bug0, Ranger, QA.tech, QA Wolf, TestSprite</td><td>AI agents drive real browsers to find <em>bugs</em> and run regression suites</td><td>They measure correctness, not comprehension. A confusing product passes all their tests. Sold to engineering, not product</td></tr>
+  <tr><td><strong>E. Analytics &amp; replay</strong></td><td>FullStory, Contentsquare (now owns Hotjar &amp; Heap), Amplitude, PostHog</td><td>Record and analyse what real users did</td><td>Requires real users to suffer first. Diagnostic, never preventive</td></tr>
+  <tr><td><strong>F. Raw browser agents</strong></td><td>Browser Use, Skyvern, OpenAI / Anthropic computer use</td><td>General-purpose "AI that uses a computer"</td><td>Toolkits, not products. No persona, no report, no evidence, no verdict &mdash; but they lower the barrier for others to build what we are building</td></tr>
+</table>
+
+<h3>The four that matter most</h3>
+<table class="tight">
+  <tr><th style="width:14%">Competitor</th><th style="width:15%">Funding / scale</th><th style="width:18%">Pricing</th><th style="width:26%">Their strength</th><th>Their gap &mdash; our opening</th></tr>
+  <tr><td><strong>Spur</strong><br><em>closest</em></td><td>$4.5M seed &mdash; First Round, Pear, Conviction<sup>[9]</sup></td><td>Annual, volume-based, quote only<sup>[14]</sup></td><td>Real AI agents in real browsers; 30+ customers; strong e-commerce logos; already offers a "UI/UX testing" agent</td><td>Positioned and sold as <strong>QA</strong>, mostly to retail. UX is a side feature, not the product. The buyer they've chosen is the engineering budget</td></tr>
+  <tr><td><strong>Uxia</strong></td><td>Early stage</td><td>Free trial, then "custom" &mdash; demo required<sup>[13]</sup></td><td>Directly on-message: synthetic testers, friction reports, SUS/SUPR-Q benchmarks, claims 17x faster and 5x cheaper</td><td>Prototype-first heritage; opaque enterprise pricing blocks the self-serve founder we want; no published stance on when its own AI is wrong</td></tr>
+  <tr><td><strong>UserTesting</strong></td><td>Market incumbent, private equity owned</td><td>~$36k/yr SMB, ~$148k/yr enterprise<sup>[7]</sup></td><td>1M+ real human panel, trusted brand, enterprise relationships</td><td>Real humans cost real money. Structurally cannot serve a 15-person startup, and cannot run on every release</td></tr>
+  <tr><td><strong>Maze</strong></td><td>Well funded, large user base</td><td>Free tier; $99/mo Starter; custom above<sup>[8]</sup></td><td>Loved by designers, strong self-serve motion, and it <strong>already ships an AI "Synthetic Users" feature</strong><sup>[12]</sup></td><td>Their synthetic users answer questions; they don't operate the live product. Bolting real browser control onto their stack is a serious build, not a feature flag</td></tr>
+</table>
+<div class="box warn"><span class="lbl">The uncomfortable truth</span>Spur and Uxia are already doing a version of this, and Maze can move into it. We are not first. What we have is a <strong>positioning gap</strong>, not a technology gap &mdash; the QA players own "does it work", the research players own "what do people think", and nobody has convincingly claimed <strong>"can this specific kind of person actually get through your product"</strong>. That claim is winnable, but only on trust and evidence quality, not on being clever.</div>
+
+<h2 class="pagebreak"><span class="num">10</span>Where We Beat Them</h2>
+<p class="kicker">Nine specific things. The first three are the ones that actually matter.</p>
+
+<h4>1. We tell customers when our own AI was wrong &mdash; nobody else does</h4>
+<p>Every finding is labelled <em>product problem</em>, <em>AI limitation</em>, or <em>technical failure</em>. Every competitor in category B and C has an incentive to hide the second one, because it makes their product look weaker. We publish it. It costs us a little credibility per report and buys us all the credibility that matters: when we say something is a real problem, it can be believed. <strong>This is the single hardest thing for a competitor to copy, because copying it means admitting they were hiding it.</strong></p>
+
+<h4>2. We make the AI state what it expects before it acts</h4>
+<p>"I expect this to save my invoice and show a confirmation." Then we compare that to what actually happened. Every mismatch is a candidate usability problem, grounded in something observable rather than in an AI's opinion after the fact. Competitors generate findings by asking a model to summarise a session; we generate them from a recorded contradiction.</p>
+
+<h4>3. Every finding must cite the exact step it came from, and we verify the citation exists</h4>
+<p>If the report references step 12, there is a step 12, with a screenshot. Findings with invalid references are rejected automatically before the customer ever sees them. This kills the biggest failure mode of every AI research tool: fluent, confident, invented insight.</p>
+
+<table class="tight" style="margin-top:14px">
+  <tr><th style="width:30%">Also better</th><th>Why it wins</th></tr>
+  <tr><td><strong>4. Real product, real browser, real state</strong></td><td>Category B competitors ask an LLM to imagine your product. We open it. Real error messages, real loading states, real dead ends.</td></tr>
+  <tr><td><strong>5. Persona-first, not test-case-first</strong></td><td>The QA players start from "here is the flow to check". We start from "here is the person". That produces different findings and, crucially, reaches a different budget.</td></tr>
+  <tr><td><strong>6. Transparent, self-serve pricing</strong></td><td>Uxia and Spur both hide pricing behind a demo. A founder with a leaking funnel at 11pm wants to run a test now. We let them. That is a real distribution advantage against enterprise-motion competitors.</td></tr>
+  <tr><td><strong>7. Reports improve retroactively</strong></td><td>Our evaluation runs on the saved recording, not live. When we improve our analysis, we can re-run it across every past session &mdash; customers' old reports get better for free, and we can prove our accuracy is improving.</td></tr>
+  <tr><td><strong>8. We optimise for non-technical personas</strong></td><td>Most tools implicitly test a competent user. The money leaks where the confused first-timer gives up. That is deliberately where we aim.</td></tr>
+  <tr><td><strong>9. Friction diff per release</strong></td><td>"Your onboarding got 2 steps harder this week." Nobody in category A or B can offer that, because human panels can't run weekly. This turns a one-off study into a subscription.</td></tr>
+</table>
+
+<div class="box"><span class="lbl">What we will not beat them at &mdash; and should not pretend to</span>
+<ul style="margin:4px 0 0;padding-left:16px">
+<li><strong>Real human emotion.</strong> UserTesting gets you a person sighing in frustration on video. We never will. When emotional truth is the requirement, they win.</li>
+<li><strong>Brand, pricing and desirability research.</strong> That is category B's ground, not ours.</li>
+<li><strong>Deep bug detection.</strong> Momentic and QA Wolf will find more defects than we do. We are complementary to them, not a replacement.</li>
+<li><strong>Enterprise trust today.</strong> Security reviews and procurement will take us years to satisfy.</li>
+</ul>
+<div style="height:5px"></div>Being explicit about this is not weakness. A tool that claims to replace all user research will be dismissed by every serious researcher on first contact.</div>
+
+<h2 class="pagebreak"><span class="num">11</span>Pricing and Revenue Estimates</h2>
+<p class="kicker">Everything in this section is our own estimate, built bottom-up from the pricing benchmarks in section 9. It is a model to argue with, not a forecast.</p>
+
+<h3>What one simulation costs us</h3>
+<table class="tight">
+  <tr><th style="width:38%">Cost component</th><th class="num-cell" style="width:20%">Today (V0)</th><th class="num-cell" style="width:20%">Optimised</th><th>Note</th></tr>
+  <tr><td>AI model usage (~30 steps)</td><td class="num-cell">$0.20 &ndash; $0.60</td><td class="num-cell">$0.08 &ndash; $0.20</td><td>Falls with model prices and better prompting</td></tr>
+  <tr><td>Browser compute</td><td class="num-cell">$0.02 &ndash; $0.10</td><td class="num-cell">$0.02</td><td>A few minutes of a browser</td></tr>
+  <tr><td>Storage (screenshots, recording)</td><td class="num-cell">&lt; $0.01</td><td class="num-cell">&lt; $0.01</td><td>Negligible per run</td></tr>
+  <tr><td><strong>Total per simulation</strong></td><td class="num-cell"><strong>~$0.40</strong></td><td class="num-cell"><strong>~$0.15</strong></td><td>Our key unit economic</td></tr>
+</table>
+<p>At the Growth tier below, a customer pays roughly <strong>$1.66 per simulation</strong> against a <strong>$0.40</strong> cost &mdash; about a <strong>75% gross margin</strong> today, rising towards 90% as model costs fall. That is healthy SaaS economics, and it is the number to watch most closely.</p>
+
+<h3>Proposed pricing</h3>
+<table class="tight">
+  <tr><th style="width:15%">Tier</th><th class="num-cell" style="width:15%">Price</th><th class="num-cell" style="width:15%">Simulations</th><th>Who it is for</th></tr>
+  <tr><td><strong>Free</strong></td><td class="num-cell">$0</td><td class="num-cell">3 / month</td><td>Try it on your own onboarding. Our main acquisition channel.</td></tr>
+  <tr><td><strong>Starter</strong></td><td class="num-cell">$99 / mo</td><td class="num-cell">50</td><td>Solo founder or small team. Deliberately matched to Maze's $99 entry point<sup>[8]</sup>.</td></tr>
+  <tr><td><strong>Growth</strong></td><td class="num-cell">$499 / mo</td><td class="num-cell">300</td><td>Our target tier. Multiple personas, release comparisons, CI integration.</td></tr>
+  <tr><td><strong>Scale</strong></td><td class="num-cell">$1,999 / mo</td><td class="num-cell">1,500</td><td>Mid-market product teams running continuously.</td></tr>
+  <tr><td><strong>Enterprise</strong></td><td class="num-cell">$25k&ndash;$60k / yr</td><td class="num-cell">Custom</td><td>Still far below UserTesting's ~$148k enterprise average<sup>[7]</sup>.</td></tr>
+</table>
+<p><em>Why this shape:</em> we undercut UserTesting by roughly <strong>30x</strong> at the low end while sitting alongside Maze &mdash; a price a founder can approve without a meeting. The price is per simulation volume, not per seat, so the whole team can look at the results. Seat-based pricing would actively discourage the sharing that makes the product spread inside a company.</p>
+
+<h3>Three-year revenue scenarios</h3>
+<table class="tight">
+  <tr><th style="width:16%">Scenario</th><th colspan="2" style="width:28%">Year 1 (to Aug 2027)</th><th colspan="2" style="width:28%">Year 2</th><th colspan="2">Year 3</th></tr>
+  <tr><td></td><td class="num-cell">Customers</td><td class="num-cell">ARR</td><td class="num-cell">Customers</td><td class="num-cell">ARR</td><td class="num-cell">Customers</td><td class="num-cell">ARR</td></tr>
+  <tr><td><strong>Conservative</strong><br><span style="font-size:8pt;color:#6b7391">Slow product-market fit</span></td><td class="num-cell">25</td><td class="num-cell">$60k</td><td class="num-cell">90</td><td class="num-cell">$345k</td><td class="num-cell">200</td><td class="num-cell">$1.0M</td></tr>
+  <tr><td><strong>Base</strong><br><span style="font-size:8pt;color:#6b7391">Our planning case</span></td><td class="num-cell">45</td><td class="num-cell"><strong>$140k</strong></td><td class="num-cell">180</td><td class="num-cell"><strong>$865k</strong></td><td class="num-cell">480</td><td class="num-cell"><strong>$3.2M</strong></td></tr>
+  <tr><td><strong>Aggressive</strong><br><span style="font-size:8pt;color:#6b7391">Content engine works + 2 enterprise deals</span></td><td class="num-cell">80</td><td class="num-cell">$335k</td><td class="num-cell">350</td><td class="num-cell">$2.2M</td><td class="num-cell">900</td><td class="num-cell">$7.6M</td></tr>
+</table>
+<h4>The assumptions behind the base case &mdash; argue with these, not the totals</h4>
+<ul>
+  <li><strong>Months 1&ndash;4:</strong> no revenue. Build V0, run 10 free design partners, publish teardowns.</li>
+  <li><strong>Months 5&ndash;12:</strong> charge. Reach 45 paying customers at an average of <strong>$260/month</strong> (mostly Starter, some Growth) &rarr; <strong>$140k ARR</strong>.</li>
+  <li><strong>Year 2:</strong> 180 customers, average rises to $400/month as teams move to Growth &rarr; <strong>$865k ARR</strong>. At a team of four, this is roughly break-even.</li>
+  <li><strong>Year 3:</strong> 480 customers at ~$550/month average, including 3&ndash;5 enterprise contracts &rarr; <strong>$3.2M ARR</strong>.</li>
+  <li><strong>Sanity check:</strong> 480 customers is about <strong>3%</strong> of the ~15,000 addressable SaaS companies. Ambitious but not fantasy for a self-serve tool with a strong content engine.</li>
+  <li><strong>Churn assumed at 4%/month</strong> in year 1 falling to 2.5% &mdash; realistic for SMB SaaS, and the single most dangerous assumption on this page.</li>
+</ul>
+<div class="box dark"><span class="lbl">What to watch instead of ARR, in year one</span><strong>Percentage of our findings that a human reviewer agrees are genuine product problems.</strong> If that number sits above roughly 70%, the revenue model above is plausible. If it sits at 40%, none of these numbers happen, no matter how good the marketing is. Everything else is downstream of that one measurement.</div>
+
+<h2 class="pagebreak"><span class="num">12</span>Go-to-Market</h2>
+<h3>The wedge: free public teardowns</h3>
+<p>Every week we run our own agent against a well-known product's sign-up flow and publish the report free: <em>"We sent a non-technical first-time user through [Product]'s onboarding. Here is where they got stuck."</em> This does four jobs at once &mdash; it is marketing content, it is proof the product works, it is our own accuracy testing, and it reliably reaches the product team at the company being reviewed. It is the cheapest distribution available to us, and it compounds.</p>
+<h3>Sequence</h3>
+<table class="tight">
+  <tr><th style="width:18%">Phase</th><th style="width:26%">Motion</th><th>Goal</th></tr>
+  <tr><td><strong>Months 1&ndash;4</strong></td><td>10 free design partners from our own network</td><td>Does the output make them change something? If nobody changes anything, stop and rethink.</td></tr>
+  <tr><td><strong>Months 5&ndash;9</strong></td><td>Weekly public teardowns + founder-led outbound on LinkedIn/X</td><td>First 25 paying customers. Learn which persona/goal pairs produce the best findings.</td></tr>
+  <tr><td><strong>Months 10&ndash;18</strong></td><td>Self-serve sign-up, SEO from accumulated teardowns, accelerator partnerships</td><td>Remove ourselves from the sales loop for anything under $500/month.</td></tr>
+  <tr><td><strong>Year 2+</strong></td><td>Agency resellers; CI/CD integration; first enterprise contracts</td><td>Recurring, embedded usage rather than occasional studies.</td></tr>
+</table>
+<div class="box good"><span class="lbl">The strategic prize</span>The one-off audit is a nice business. The real one is becoming a <strong>required step before every release</strong> &mdash; "50 AI customers tried the new onboarding last night, 3 new problems appeared." That converts us from a research tool people remember to buy into infrastructure they cannot switch off. Everything in the roadmap points there.</div>
+
+<h2><span class="num">13</span>What We Are Building First (V0)</h2>
+<div class="box good"><span class="lbl">The only goal of V0</span><strong>One AI agent can open a real website in a real browser, work towards a goal on its own, record everything it did, and produce a report.</strong> Run from the command line. Nothing else.</div>
+<div class="two">
+  <div>
+    <h3>In scope for V0</h3>
+    <ul>
+      <li>A command-line tool: <em>run this goal, as this persona, on this website</em></li>
+      <li>The AI decision loop</li>
+      <li>Real browser control</li>
+      <li>Full recording of every step, with screenshots</li>
+      <li>The final structured report</li>
+      <li>Tests, run against our own small test website</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Deliberately NOT in V0</h3>
+    <ul>
+      <li>No website / dashboard / UI</li>
+      <li>No customer accounts or logins</li>
+      <li>No billing</li>
+      <li>No cloud servers</li>
+      <li>No running many sessions at once</li>
+      <li>No automatic persona generation</li>
+    </ul>
+  </div>
+</div>
+<p><strong>Why so small?</strong> The only real risk in this business is whether the AI can genuinely use unfamiliar software like a person, and whether we can tell a real product problem from our own AI's confusion. Everything else &mdash; dashboards, accounts, billing &mdash; is ordinary work any competent team can do later. If the core does not work, none of the rest matters.</p>
+<h3>V0 is done when</h3>
+<ol>
+  <li>One command drives a real browser through a real website on its own.</li>
+  <li>Every action the AI takes is checked, executed and recorded.</li>
+  <li>Every run finishes with a clear outcome: <span class="pill yes">SUCCESS</span> <span class="pill">FAILURE</span> <span class="pill">STUCK</span> <span class="pill">TIMEOUT</span> <span class="pill">ERROR</span> &mdash; it can never hang forever.</li>
+  <li>Every run produces a saved session and a structured report.</li>
+  <li>The test suite passes.</li>
+</ol>
+
+<h2 class="pagebreak"><span class="num">14</span>How It Works Under the Hood</h2>
+<div class="flow">
+  <div class="s"><b>1 &middot; LOOK</b><span>Read what is on the screen right now</span></div>
+  <div class="a">&darr;</div>
+  <div class="s"><b>2 &middot; UNDERSTAND</b><span>Where am I? What can I do here?</span></div>
+  <div class="a">&darr;</div>
+  <div class="s"><b>3 &middot; DECIDE</b><span>What would this kind of person do next &mdash; and why?</span></div>
+  <div class="a">&darr;</div>
+  <div class="s"><b>4 &middot; ACT</b><span>Click, type, scroll, or go back</span></div>
+  <div class="a">&darr;</div>
+  <div class="s"><b>5 &middot; SEE WHAT HAPPENED</b><span>Did it do what I expected?</span></div>
+  <div class="a">&darr;</div>
+  <div class="s" style="border-color:#8a93b0;background:#f6f8fd"><b>RECORD EVERYTHING</b><span>Screenshot &middot; action &middot; reasoning &middot; result</span></div>
+  <div class="loop">&#8634; repeat until the goal is achieved, the AI gives up, or a limit is hit</div>
+</div>
+<h3>The most important safety rule</h3>
+<div class="box warn"><strong>The AI never writes or runs code. Ever.</strong><br>
+It can only pick from a short, fixed menu of actions &mdash; click, type, select, scroll, press a key, go back, wait, finish, give up. And it can only point at things we have already shown it on the page; it cannot invent a target.<br><br>
+A separate piece of our software &mdash; not the AI &mdash; is the only thing that actually touches the browser. Every choice the AI makes is checked against strict rules before anything happens. This means the AI cannot do something unexpected even if it tried, and everything that happened is explainable afterwards.</div>
+
+<h2><span class="num">15</span>What We Are Building It With</h2>
+<p class="kicker">Kept intentionally boring and small &mdash; one codebase, runs on a laptop.</p>
+<table class="tight">
+  <tr><th style="width:22%">Tool</th><th>What it does for us, in plain terms</th></tr>
+  <tr><td><strong>Node.js + TypeScript</strong></td><td>The language we write in. TypeScript catches mistakes before we run anything.</td></tr>
+  <tr><td><strong>Playwright</strong></td><td>Controls a real web browser &mdash; the same tool the big testing companies use.</td></tr>
+  <tr><td><strong>OpenAI API</strong></td><td>The "brain" that decides what the customer would do next.</td></tr>
+  <tr><td><strong>Zod</strong></td><td>The gatekeeper. Every decision the AI makes is checked by this before we allow it to happen.</td></tr>
+  <tr><td><strong>SQLite</strong></td><td>A simple file-based database that stores every session. No server needed.</td></tr>
+  <tr><td><strong>Pino</strong></td><td>Logging, so we can see exactly what happened when something goes wrong.</td></tr>
+  <tr><td><strong>Vitest</strong></td><td>Runs our tests automatically.</td></tr>
+</table>
+<p>What we are <em>not</em> using, on purpose: no cloud infrastructure, no separate services, no databases that need servers, no frontend framework. Every one of those can be added later in days. Adding them now would slow us down for no benefit.</p>
+
+<h2><span class="num">16</span>Safety Rules We Are Building In From Day One</h2>
+<ul>
+  <li><strong>The AI cannot spend money or destroy anything.</strong> Buttons like "Pay", "Purchase", "Delete" and "Send" are blocked at the software level &mdash; not merely discouraged in an instruction.</li>
+  <li><strong>Passwords never reach the AI.</strong> The AI says "type the password here"; our software fills it in. The password never appears in the AI's input, its output, our logs, or our saved records.</li>
+  <li><strong>Every session runs in a clean, isolated browser.</strong> Nothing carries over between runs.</li>
+  <li><strong>The AI cannot wander off to other websites.</strong> It is locked to the site being tested.</li>
+  <li><strong>Every run has a hard stop.</strong> Step limits, time limits, and detection of going in circles. Nothing can run forever or run up a bill.</li>
+  <li><strong>We test on staging and demo environments</strong>, not on live systems holding real customer data.</li>
+</ul>
+
+<h2 class="pagebreak"><span class="num">17</span>The Honest Risks</h2>
+<h3>Technical risks</h3>
+<table class="tight">
+  <tr><th style="width:30%">Risk</th><th>What we do about it</th></tr>
+  <tr><td><strong>Reading the screen properly is genuinely hard.</strong> Some apps are drawn in ways software struggles to interpret.</td><td>This is our core engineering challenge and where our real advantage comes from. It is isolated into one replaceable part so we can keep improving it.</td></tr>
+  <tr><td><strong>Sign-up often needs email confirmation.</strong> Our flagship example hits this wall on most real products.</td><td>Accepted limitation for V0. Reading a temporary inbox is the first thing we add afterwards. It also determines which demo site we pick.</td></tr>
+  <tr><td><strong>Bot protection.</strong> CAPTCHAs will block us on some live sites.</td><td>We test on staging environments the customer controls, and stop cleanly when we detect a CAPTCHA rather than flailing.</td></tr>
+  <tr><td><strong>Cost and speed per session.</strong></td><td>We record exact cost per run from day one and optimise on real numbers.</td></tr>
+</table>
+<h3>Business risks &mdash; these are the ones that kill companies</h3>
+<table class="tight">
+  <tr><th style="width:30%">Risk</th><th>What we do about it</th></tr>
+  <tr><td><strong>Our AI is simply bad at it</strong>, and every "problem" we report is our own incompetence in disguise.</td><td>The single biggest risk we have. Every finding is cause-labelled, every session replayable, and we track our own accuracy as the headline metric. If it stays low, we stop &mdash; that is a real possible outcome and we should agree now that we would accept it.</td></tr>
+  <tr><td><strong>Incumbents add this as a feature.</strong> Maze already ships synthetic users<sup>[12]</sup>; Spur already ships a UI/UX agent<sup>[14]</sup>.</td><td>We cannot out-feature them. We win on depth in one narrow claim and on trustworthiness of evidence. If we cannot make that claim stick within 12 months, we likely never will.</td></tr>
+  <tr><td><strong>Foundation models commoditise this.</strong> If OpenAI's or Anthropic's browser agents get very good and very cheap, the barrier collapses.</td><td>Partly unavoidable, and partly a tailwind &mdash; our costs fall too. The defence is the accumulated session data, the accuracy benchmark, and the customer workflow, not the agent itself. The agent is not the moat.</td></tr>
+  <tr><td><strong>"Vitamin, not painkiller."</strong> Teams may agree it is interesting and still not pay.</td><td>Exactly what the 10 design partners are there to test. The question to answer is not "do you like this" but <em>"did you change something because of it"</em>. If nothing changes, the business does not exist.</td></tr>
+  <tr><td><strong>Crowded, well-funded market.</strong> $1.5B has already gone in<sup>[5]</sup>.</td><td>We stay narrow, cheap and fast rather than competing on breadth. Our advantage is that we can serve the 15-person startup profitably and they structurally cannot.</td></tr>
+</table>
+
+<h2><span class="num">18</span>Where This Goes After V0</h2>
+<table class="tight">
+  <tr><th style="width:16%">Stage</th><th>What gets added</th></tr>
+  <tr><td><strong>V0</strong><br><em>now</em></td><td>One AI customer, one goal, one website, from the command line. Prove the core works.</td></tr>
+  <tr><td><strong>V1</strong></td><td>Email inbox support so sign-ups can complete; several personas per test; side-by-side comparison of how different customer types fare.</td></tr>
+  <tr><td><strong>V2</strong></td><td>A web dashboard: launch a test, watch the replay, read the report. This is what makes it sellable to non-technical buyers.</td></tr>
+  <tr><td><strong>V3</strong></td><td>Runs automatically on every release &mdash; "50 AI customers tried your new onboarding last night; 3 new problems appeared." The recurring-revenue version.</td></tr>
+</table>
+
+<h2><span class="num">19</span>Open Questions For Us Two</h2>
+<ol>
+  <li><strong>Do we accept that we are not first?</strong> Spur and Uxia already exist. Our bet is on positioning and evidence quality, not novelty. If either of us is not convinced by that bet, now is the moment to say so.</li>
+  <li><strong>Which website do we demo on?</strong> A real product, ideally without mandatory email confirmation at sign-up.</li>
+  <li><strong>Who is our first customer type?</strong> Seed&ndash;Series B SaaS founders (fast to sell, small budgets) or established product teams (slow to sell, real budgets)? The base case assumes the former.</li>
+  <li><strong>Do we agree on the one number?</strong> Percentage of findings a human agrees are genuine product problems. Above ~70% we continue, below ~40% we stop.</li>
+  <li><strong>How long do we give V0?</strong> Weeks, not months. Suggest a hard checkpoint at 6 weeks.</li>
+</ol>
+
+<h2 class="pagebreak"><span class="num">20</span>Sources</h2>
+<p class="kicker">Market-size figures come from commercial research firms and vary widely between them &mdash; they are directional, not precise. Everything in section 11 is our own estimate.</p>
+<ol class="srcs">
+  <li>Fortune Business Insights &mdash; UX Research Software Market. <span>fortunebusinessinsights.com/user-experience-ux-research-software-market-110632</span></li>
+  <li>Verified Market Reports &mdash; Usability Testing Software Market, 2026&ndash;2034. <span>verifiedmarketreports.com/product/usability-testing-software-market/</span></li>
+  <li>Business Research Insights &mdash; User Research and User Testing Software Market. <span>businessresearchinsights.com/market-reports/user-research-and-user-testing-software-market-129014</span></li>
+  <li>Mordor Intelligence &mdash; AI-Powered Software Testing and QA Market. <span>mordorintelligence.com/industry-reports/ai-powered-software-testing-and-qa-market</span></li>
+  <li>AgentMarketCap &mdash; "The Autonomous QA Gold Rush", April 2026. <span>agentmarketcap.ai/blog/2026/04/08/momentic-autonomous-qa-agent-testing-market-2026</span></li>
+  <li>Ascendix &mdash; How Many SaaS Companies Are There In the World. <span>ascendixtech.com/number-saas-companies-statistics/</span></li>
+  <li>Vendr / SpendHound contract benchmarks &mdash; UserTesting pricing. <span>vendr.com/marketplace/usertesting</span></li>
+  <li>UXtweak &mdash; Maze Pricing in 2026. <span>blog.uxtweak.com/maze-pricing/</span></li>
+  <li>GlobeNewswire / Pulse2 &mdash; Spur raises $4.5M, April 2025. <span>globenewswire.com/news-release/2025/04/17/3063473/0/en/</span></li>
+  <li>Bug0 Knowledge Base and AI Pricing Guru &mdash; AI QA pricing index, 2026. <span>aipricing.guru/ai-qa-agentic-test-automation-pricing-index/</span></li>
+  <li>shno.co and Visionary Marketing &mdash; SaaS free trial and onboarding benchmarks, 2026. <span>shno.co/marketing-statistics/free-trial-conversion-statistics</span></li>
+  <li>Maze &mdash; Future of UX Research report; Maze Synthetic Users product page. <span>maze.co/blog/ai-tools-user-research/</span></li>
+  <li>Uxia product and pricing pages. <span>uxia.app</span></li>
+  <li>Spur product and pricing pages. <span>spurtest.com</span></li>
+  <li>Ditto / Minds &mdash; Synthetic Research Platforms 2026 Market Map. <span>askditto.io/news/synthetic-research-platforms-the-2026-market-map</span></li>
+</ol>
+
+<div class="foot">AI Customer Simulation Platform &nbsp;&middot;&nbsp; Founder briefing &nbsp;&middot;&nbsp; 25 August 2026 &nbsp;&middot;&nbsp; Internal draft. Market data as cited; revenue model is our own estimate. Architecture agreed, implementation not yet started.</div>
+
+</body></html>
