@@ -64,7 +64,8 @@ export async function runSimulation(
     ? createArtifacts(join(config.dataDir, 'artifacts'), sessionId)
     : null;
 
-  const llmClient = deps.llmClient ?? createLlmClient(deps.env.openaiApiKey);
+  const llmClient =
+    deps.llmClient ?? createLlmClient(deps.env.openaiApiKey, deps.env.openaiBaseUrl);
   const planner =
     deps.planner ?? createModelPlanner({ client: llmClient, model: deps.env.plannerModel });
 

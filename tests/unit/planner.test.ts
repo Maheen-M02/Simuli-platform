@@ -197,3 +197,27 @@ describe('prompt construction', () => {
     expect(buildSystemPrompt({ ...input, persona })).toContain('enter real card details');
   });
 });
+
+describe('OpenAI-compatible endpoints', () => {
+  it('names a silent schema downgrade instead of reporting a parse failure', async () => {
+    // Measured behaviour on NVIDIA NIM: some models accept response_format and
+    // return prose with a 200. Retrying cannot fix a misconfigured endpoint, so
+    // the error has to say what is actually wrong.
+    const proseClient: LlmClient = {
+      async completeJson() {
+        return err(
+          'The endpoint ignored the requested JSON schema and replied with prose. ' +
+            'Model "meta/llama-3.2-11b-vision-instruct" cannot be used for this: ' +
+            'pick one that supports strict structured output.',
+        );
+      },
+    };
+
+    const result = await planner(proseClient)(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toContain('ignored the requested JSON schema');
+      expect(result.error).toContain('strict structured output');
+    }
+  });
+});

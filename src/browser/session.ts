@@ -106,6 +106,21 @@ export async function startSession(
     });
   });
 
+  // esbuild (which both tsx and vitest use, configured differently) can compile
+  // a named function into a call to an injected `__name` helper. Our DOM walk
+  // is stringified and shipped into the page, where that helper does not
+  // exist — so the function throws `__name is not defined` on arrival, and the
+  // run dies with BROWSER_LOST before its first step.
+  //
+  // This is invisible to the test suite: vitest's transform does not inject the
+  // helper, so the same code that passes under `npm test` fails under the CLI.
+  // Rather than depend on any toolchain's settings, give the page a harmless
+  // identity shim. Runs before any page script, on every document.
+  await context.addInitScript(() => {
+    const scope = globalThis as unknown as Record<string, unknown>;
+    scope['__name'] ??= (fn: unknown) => fn;
+  });
+
   const page = await context.newPage();
 
   return {

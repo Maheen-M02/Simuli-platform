@@ -140,6 +140,37 @@ describe('observation', () => {
   });
 });
 
+describe('code injected into the page', () => {
+  it('survives a build that rewrites named functions', async () => {
+    // Found by the first real CLI run, not by this suite: esbuild with
+    // keepNames compiles our DOM walk into calls to an injected `__name`
+    // helper, which does not exist inside the browser. tsx does this and
+    // vitest does not, so the same code passed `npm test` and died instantly
+    // under the CLI with `__name is not defined`.
+    await session.page.goto(`${site.url}/signup`);
+    expect(await session.page.evaluate(() => typeof (globalThis as never)['__name'])).toBe('function');
+
+    // The shim must survive navigation, or it only protects the first page.
+    await session.page.goto(`${site.url}/pricing`);
+    expect(await session.page.evaluate(() => typeof (globalThis as never)['__name'])).toBe('function');
+
+    // And it must be harmless: an identity function, not a transform.
+    const identity = await session.page.evaluate(() => {
+      const name = (globalThis as never)['__name'] as (fn: unknown) => unknown;
+      const fn = () => 42;
+      return name(fn) === fn;
+    });
+    expect(identity).toBe(true);
+  });
+
+  it('still extracts a snapshot on a page that defines its own __name', async () => {
+    // The shim uses ??=, so a page with its own binding keeps it.
+    await session.page.goto(`${site.url}/signup`);
+    const observation = await look();
+    expect(observation.snapshot.nodes.length).toBeGreaterThan(0);
+  });
+});
+
 describe('execution', () => {
   it('completes signup -> onboarding -> invoice using only refs', async () => {
     await session.page.goto(site.url);

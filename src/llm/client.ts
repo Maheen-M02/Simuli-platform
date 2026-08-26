@@ -11,6 +11,15 @@ import { err, ok, type Result } from '../types/shared.ts';
  * Failures are returned, never thrown. A model that is down or rate-limited is
  * an ordinary condition for a long-running agent, and it must become a recorded
  * step rather than an exception that ends a run with no evidence.
+ *
+ * `baseUrl` allows any OpenAI-compatible endpoint. One requirement is
+ * non-negotiable: the endpoint must honour `response_format` with a strict
+ * `json_schema`. Several compatible gateways accept that parameter and quietly
+ * ignore it, returning prose with a 200 — measured on NVIDIA NIM, where
+ * `meta/llama-3.2-11b-vision-instruct` does exactly this while
+ * `openai/gpt-oss-120b` honours the schema correctly. A silent downgrade is
+ * worse than a refusal, so `looksLikeIgnoredSchema` names it explicitly rather
+ * than letting it surface as a generic parse failure.
  */
 
 export type JsonRequest = {
@@ -40,8 +49,18 @@ function isRetryable(error: unknown): boolean {
   return true;
 }
 
-export function createLlmClient(apiKey: string): LlmClient {
-  const client = new OpenAI({ apiKey });
+/**
+ * A non-JSON reply to a strict-schema request means the endpoint disregarded
+ * the schema. Retrying cannot fix that, and the operator needs to know it is a
+ * configuration problem rather than a flaky model.
+ */
+function looksLikeIgnoredSchema(content: string): boolean {
+  const trimmed = content.trim();
+  return trimmed !== '' && !trimmed.startsWith('{') && !trimmed.startsWith('[');
+}
+
+export function createLlmClient(apiKey: string, baseUrl?: string): LlmClient {
+  const client = new OpenAI({ apiKey, ...(baseUrl === undefined ? {} : { baseURL: baseUrl }) });
 
   return {
     async completeJson(request) {
@@ -87,6 +106,13 @@ export function createLlmClient(apiKey: string): LlmClient {
           try {
             return ok(JSON.parse(content));
           } catch {
+            if (looksLikeIgnoredSchema(content)) {
+              return err(
+                `The endpoint ignored the requested JSON schema and replied with prose. ` +
+                  `Model "${request.model}" cannot be used for this: pick one that supports ` +
+                  'strict structured output.',
+              );
+            }
             lastError = 'The model returned something that was not valid JSON.';
             continue;
           }

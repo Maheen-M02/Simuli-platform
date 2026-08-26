@@ -16,6 +16,14 @@ const SECRET_PREFIX = 'SIM_SECRET_';
 
 const EnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1, 'OPENAI_API_KEY is required'),
+  /**
+   * Points the SDK at an OpenAI-compatible endpoint instead of OpenAI itself.
+   *
+   * This is a base URL, deliberately not a provider abstraction: one string,
+   * no branching, no second code path to keep correct. See `llm/client.ts` for
+   * the constraint any such endpoint has to meet.
+   */
+  OPENAI_BASE_URL: z.string().url().optional(),
   OPENAI_PLANNER_MODEL: z.string().min(1).default('gpt-4.1'),
   OPENAI_EVALUATOR_MODEL: z.string().min(1).default('gpt-4.1'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
@@ -27,6 +35,8 @@ const EnvSchema = z.object({
 
 export type Env = {
   readonly openaiApiKey: string;
+  /** Undefined means OpenAI's own API. */
+  readonly openaiBaseUrl: string | undefined;
   readonly plannerModel: string;
   readonly evaluatorModel: string;
   readonly logLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error';
@@ -58,6 +68,7 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Result<Env, st
 
   return ok({
     openaiApiKey: parsed.data.OPENAI_API_KEY,
+    openaiBaseUrl: parsed.data.OPENAI_BASE_URL,
     plannerModel: parsed.data.OPENAI_PLANNER_MODEL,
     evaluatorModel: parsed.data.OPENAI_EVALUATOR_MODEL,
     logLevel: parsed.data.LOG_LEVEL,
