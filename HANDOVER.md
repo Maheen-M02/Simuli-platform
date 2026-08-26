@@ -6,9 +6,12 @@ For a Claude Code session picking this project up on another machine.
 
 ## 1. Status in one line
 
-**Architecture is designed and approved-in-principle. No application code has been
-written yet, and implementation has NOT been authorised.** Do not start building
-until the user explicitly says to proceed (see §6).
+**V0 is built and green against the local fixture site (126 tests). The one
+thing left is the first run driven by a real model against a real website,
+which needs an `OPENAI_API_KEY` and a chosen demo target.**
+
+Implementation was authorised on 2026-08-26, along with the two decisions that
+were blocking it: use `node:sqlite`, and keep the `expectation` field.
 
 ---
 
@@ -37,16 +40,49 @@ CLAUDE.md                                  Project instructions. Read first.
 HANDOVER.md                                This file.
 docs/startup-overview.html                 Source for the founder briefing PDF.
 docs/AI-Customer-Simulation-Overview.pdf   21-page founder briefing (generated).
-.gitignore
+src/  tests/                               The runtime and its 126 tests.
+package.json  tsconfig.json  vitest.config.ts  .env.example  .gitignore
 ```
 
-There is no `package.json`, no `src/`, no dependencies installed. That is expected.
+The source map, and what each part is for:
+
+```
+src/
+  runSimulation.ts   The library entry point. Everything else serves this.
+  cli/               main.ts (arg parsing, exit codes), render.ts (the report).
+  config/            env.ts (secrets, validated), runConfig.ts (one run).
+  actions/schema.ts  The model-output security boundary. Read this first.
+  observations/      extract.browser.ts (in-page DOM walk), serialize.ts,
+                     redact.ts (redaction on write), observe.ts, types.ts.
+  browser/           session.ts (isolated context, origin allowlist),
+                     resolver.ts (fail-never-guess), executor.ts (enforcement).
+  agent/             loop.ts, planner.ts, prompt.ts, termination.ts.
+  evaluation/        deterministic.ts (facts, no LLM), evaluator.ts, schema.ts.
+  sessions/          recorder.ts (incremental writes), types.ts.
+  persistence/       db.ts (node:sqlite), artifacts.ts (screenshots).
+  llm/client.ts      The only place model calls are made.
+  logging/logger.ts  The only place redaction is configured.
+tests/
+  unit/  integration/  fixtures/site/
+```
+
+### Running it
+
+```bash
+npm install
+npx playwright install chromium
+npm test                    # 126 tests, no API key needed, ~70s
+npm run agent -- run --url https://example.com --goal "sign up" --steps
+```
+
+`npm test` requires no API key and makes no network calls: unit tests inject a
+fake planner, integration tests run against `tests/fixtures/site/`.
 
 ---
 
 ## 4. How we got here
 
-Three requests have been handled so far:
+Four requests have been handled so far:
 
 1. **Architecture proposal.** The user asked for a full V0 design — architecture,
    directory structure, agent loop, action schema, Playwright execution,
@@ -58,6 +94,8 @@ Three requests have been handled so far:
 3. **Market research added to the PDF.** Market sizing, business model canvas,
    competitor analysis, differentiation and revenue estimates were researched
    from the live web and added. PDF grew to 21 pages.
+4. **V0 implemented** (2026-08-26), in the ten steps of the original build
+   order, across three commits. 126 tests.
 
 ---
 
@@ -70,7 +108,7 @@ These are all reflected in `CLAUDE.md`. The non-obvious ones, with reasoning:
 | LLM is a pure function `(persona, goal, observation, history) → Action`. No browser handle, no code execution. | Safety and auditability at the type level, not by filtering. |
 | Targets are opaque snapshot refs (`e14`), never model-authored CSS/XPath. | The model cannot hallucinate a selector. It can only point at what we showed it. |
 | **No `navigate` action.** `go_back` is allowed. | Real customers reach pages by clicking. Direct URL entry would let the agent teleport past the exact friction we sell the ability to detect. |
-| Every action carries `reasoning` **and `expectation`**. | Expectation-vs-reality is the primary friction signal. `expectation` was an addition beyond the user's original spec — the user has not yet confirmed it (see §6). |
+| Every action carries `reasoning` **and `expectation`**. | Expectation-vs-reality is the primary friction signal. An addition beyond the user's original spec, confirmed 2026-08-26. |
 | Ref resolution: `data-sim-ref` first, then role+name fallback; **fail if ambiguous, never guess**. | A wrong click is worse than a failed click. |
 | Evaluation is two-stage: deterministic pre-pass (facts, no LLM) then LLM judgment. | Technical failures are classified from machine facts, reproducibly — not inferred by a model. |
 | Every friction point must carry an attribution: `PRODUCT_FRICTION \| AGENT_LIMITATION \| TECHNICAL_FAILURE`, and cite `stepRefs` that are validated against the record. | Kills hallucinated evidence, and makes our own failure rate measurable. This is the product's trust wedge. |
@@ -78,7 +116,7 @@ These are all reflected in `CLAUDE.md`. The non-obvious ones, with reasoning:
 | Runtime is a library (`runSimulation()`); CLI is a thin wrapper. | A future API/dashboard imports the same function. |
 | Destructive-action denylist enforced in the **executor**, not the prompt. | Prompt instructions are advisory; executor checks are enforcement. |
 
-### Proposed directory structure (agreed, not yet created)
+### Directory structure (as built)
 
 ```
 src/
@@ -103,9 +141,12 @@ data/             gitignored: sessions.db + artifacts/
 
 `llm/` and `logging/` were additions beyond the user's original list: the LLM
 client is shared by planner *and* evaluator (so it cannot live in `agent/`), and
-pino redaction must be configured in exactly one place.
+pino redaction must be configured in exactly one place. Built as designed, plus
+`src/runSimulation.ts` at the root (the library entry point the CLI wraps) and
+`observations/types.ts` (the in-page walk is stringified into the browser, so
+its types have to live somewhere the Node side can import).
 
-### Proposed action schema (agreed, not yet written)
+### Action schema (as built — see `src/actions/schema.ts`)
 
 Zod discriminated union on `action`. Shared fields on every variant:
 `reasoning: string`, `expectation: string`.
@@ -124,21 +165,19 @@ fail      { reason, blocker }
 
 ---
 
-## 6. OPEN — blocking implementation
+## 6. OPEN
 
-**The user has not yet said "proceed".** Do not write application code until they do.
+Two of the three technical questions are settled:
 
-Three technical questions were put to the user and are still unanswered:
+1. ~~SQLite driver~~ — **`node:sqlite`**, decided 2026-08-26. Verified working
+   unflagged on Node v24.16.0. No native module, no Windows build toolchain.
+2. **Demo target site — still open.** Most real SaaS requires email confirmation
+   at sign-up, which V0 cannot do. This defines what "working" looks like for
+   the first real run, and is now the main thing standing between us and it.
+3. ~~Confirm `expectation`~~ — **kept**, decided 2026-08-26. It is on every
+   action variant, and the evaluator depends on it.
 
-1. **SQLite driver.** `better-sqlite3` (recommended — mature, prebuilt binaries,
-   but a native module) vs. Node 24's built-in `node:sqlite` (zero-dependency, no
-   Windows build toolchain, still marked experimental). The user is on Windows,
-   which is why this matters.
-2. **Demo target site.** Most real SaaS requires email confirmation at sign-up,
-   which V0 cannot do. The demo site must be chosen with that constraint in mind,
-   because it defines what "working" looks like for V0.
-3. **Confirm the `expectation` field** on every action — the one addition beyond
-   the user's original action schema.
+Also needed for the first real run: an `OPENAI_API_KEY` in `.env`.
 
 Plus business questions raised in the PDF (§19 of the briefing), not blocking code:
 
@@ -150,33 +189,35 @@ Plus business questions raised in the PDF (§19 of the briefing), not blocking c
 
 ---
 
-## 7. Build order, once approved
+## 7. Build order — done
 
-Suggested sequence — each step is independently testable:
+All ten planned steps are complete (scaffolding, fixture site, action schema,
+observations, browser layer, persistence + recorder, termination + loop, model
+planner, evaluation, CLI). See the three implementation commits.
 
-1. `package.json`, `tsconfig.json` (strict), `vitest.config.ts`, `.env.example`,
-   `.gitignore`. Install Playwright, Zod, OpenAI, Pino, Vitest, SQLite driver.
-2. `tests/fixtures/site/` — the deterministic local test app (signup →
-   onboarding → invoice) over `node:http`. Build this **before** the agent, so
-   everything after it can be tested without touching a real website.
-3. `actions/schema.ts` + its unit tests (valid, invalid, adversarial model output).
-4. `observations/` — the in-page DOM walk and the serialiser. Hardest part; expect
-   iteration.
-5. `browser/` — session, resolver, executor. Integration tests against the fixture site.
-6. `sessions/` + `persistence/` — recorder and SQLite schema. Test incremental
-   writes and crash-mid-run integrity.
-7. `agent/` — termination predicates first (pure, easy to test), then the loop
-   with an **injected fake planner** returning scripted actions. No OpenAI calls
-   in unit tests.
-8. `llm/` + `agent/planner.ts` — real model calls, structured output, retry.
-9. `evaluation/` — deterministic pre-pass, then the LLM evaluator.
-10. `cli/` — thin wrapper. Then the first real end-to-end run.
+Testing rules from `CLAUDE.md` that are easy to violate, and still hold: never
+test against an external production website; unit tests never call the OpenAI
+API; integration tests assert loop/executor behaviour, never model judgment.
 
-Testing rules from `CLAUDE.md` that are easy to violate: never test against an
-external production website; unit tests never call the OpenAI API; integration
-tests assert loop/executor behaviour, never model judgment.
+### Things found while building that the design did not anticipate
 
----
+- **Chrome's own form validation is invisible in text mode.** An
+  `<input type="email">` holding a malformed value silently refuses to submit:
+  no error node appears in the DOM, so the agent sees a button that does
+  nothing. A concrete instance of the accepted "visual defects are invisible"
+  limitation, and it will look like a product bug in reports.
+- **A blocked navigation must not be aborted.** `route.abort()` leaves Chrome
+  on `chrome-error://chromewebdata/`, which destroys the agent's sense of place
+  and reads as a product crash. `session.ts` serves a plain stand-in page
+  instead, and the executor reports NAVIGATION_BLOCKED via a drain callback —
+  a refused navigation raises nothing and moves nothing, so without that the
+  agent would click the same dead link forever.
+- **`<button>` inside `<a>` is reported as one link, not two targets.** The DOM
+  walk does not descend into an anchor. Correct, but it means a visually
+  obvious button can reach the agent as a link.
+- **Enter is pressed on the field, not on ambient focus.** `locator.press`
+  rather than `keyboard.press`, so a stray Enter cannot land somewhere
+  untraceable.
 
 ## 8. Research findings (do not redo this — it cost a full research pass)
 
@@ -262,11 +303,11 @@ count changed, not just that the command exited 0.
 ## 10. Rules for the next session
 
 1. **Read `CLAUDE.md` first.** It overrides default behaviour.
-2. **Do not write application code until the user explicitly authorises it.**
-   The last thing said to them was a request for approval; they have not given it.
-3. If the user does say proceed, ask the §6 questions 1–3 first if still
-   unanswered — question 1 changes `package.json`, question 2 changes what the
-   first end-to-end run targets.
+2. **Run `npm test` before changing anything.** It is the contract. If it is
+   green the runtime works; if a change turns it red, the change is wrong until
+   proven otherwise.
+3. The next milestone is the first real model-driven run. That needs an API key
+   and a demo target site (§6.2) — not more code.
 4. Keep V0 small. The temptation will be to add a dashboard, parallel runs, or a
    persona generator. All are explicitly out of scope in `CLAUDE.md` §10.
 5. The PDF is a founder-facing document written in plain English for a

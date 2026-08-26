@@ -132,5 +132,12 @@ Done when:
    schema-validated evaluation.
 5. The required test suite passes against the local fixture site.
 
-Not started: implementation. The architecture above is approved; code is not
-yet written.
+Status: implemented and green against the local fixture site. All five
+criteria above are met in `tests/integration/run-simulation.test.ts`, which
+drives a real browser through signup -> onboarding -> invoice, records the
+session to SQLite, and produces a schema-validated evaluation — with a fake
+planner, so no OpenAI call is involved.
+
+Outstanding: the first run driven by a real model against a real website.
+That needs an `OPENAI_API_KEY` and a demo target site chosen with V0's
+no-email-verification limitation in mind. Nothing else blocks it.
