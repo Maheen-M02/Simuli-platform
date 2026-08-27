@@ -10,14 +10,17 @@
  *
  * An addition beyond the agreed V0 structure. It is a script, not a feature.
  */
-import { openDb } from './src/persistence/db.ts';
-import { evaluateSession } from './src/evaluation/evaluator.ts';
-import { createLlmClient } from './src/llm/client.ts';
-import { loadDotEnv, readEnv } from './src/config/env.ts';
+import { openDb } from '../src/persistence/db.ts';
+import { evaluateSession } from '../src/evaluation/evaluator.ts';
+import { createLlmClient } from '../src/llm/client.ts';
+import { loadDotEnv, readEnv } from '../src/config/env.ts';
+import { renderEvaluation, renderRecord, setColorEnabled } from '../src/cli/render.ts';
 
 loadDotEnv();
 const env = readEnv();
 if (!env.ok) throw new Error(env.error);
+
+setColorEnabled(process.stdout.isTTY === true);
 
 const db = openDb('data/sessions.db');
 const record = db.loadSession(process.argv[2] ?? '');
@@ -31,17 +34,18 @@ const result = await evaluateSession(record, {
     appUrl: env.value.appUrl,
   }),
   model: process.argv[3] ?? env.value.evaluatorModel,
+  // Third argument caps the reply, for a thin prepaid balance.
+  ...(process.argv[4] === undefined ? {} : { maxOutputTokens: Number(process.argv[4]) }),
   onRejectedFindings: (f) => console.log(`(discarded ${f.length} uncitable)`),
 });
 
 if (!result.ok) {
-  console.log('FAILED:', result.error);
+  process.stdout.write(`FAILED: ${result.error}\n`);
 } else {
-  console.log('goalAchieved:', result.value.goalAchieved);
-  for (const f of result.value.findings) {
-    console.log(`\n[${f.severity}] ${f.attribution}\n  ${f.title}\n  steps ${f.stepRefs.join(', ')}`);
-  }
-  const p = result.value.findings.filter((f) => f.attribution === 'PRODUCT_FRICTION').length;
-  console.log(`\n${p} product / ${result.value.findings.length - p} ours`);
+  // Reuses the product renderer, so what this prints is exactly what a run
+  // prints — including the verdict caveat. A second formatter here would be a
+  // second place for the caveat to go missing.
+  process.stdout.write(`${renderRecord(record)}\n`);
+  process.stdout.write(`${renderEvaluation(result.value)}\n`);
 }
 db.close();

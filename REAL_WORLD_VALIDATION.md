@@ -220,8 +220,12 @@ anything:
 Re-judge a recorded run without touching the browser:
 
 ```bash
-npm run eval:session -- <session-id>
+npm run eval:session -- <session-id> [model] [max-output-tokens]
 ```
+
+The third argument caps the reply, which matters on a prepaid balance: a run is
+recorded whether or not the evaluation succeeds, so a 402 on the report costs
+you the report and not the run.
 
 ---
 
