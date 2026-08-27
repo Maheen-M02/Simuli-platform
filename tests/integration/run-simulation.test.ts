@@ -27,6 +27,9 @@ let dataDir: string;
 const env: Env = {
   openaiApiKey: 'not-used-in-this-test',
   openaiBaseUrl: undefined,
+  requireStructuredOutput: false,
+  appTitle: undefined,
+  appUrl: undefined,
   plannerModel: 'fake-planner',
   evaluatorModel: 'fake-evaluator',
   logLevel: 'error',

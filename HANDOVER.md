@@ -179,6 +179,30 @@ Two of the three technical questions are settled:
 
 Also needed for the first real run: an `OPENAI_API_KEY` in `.env`.
 
+### Endpoint
+
+`OPENAI_BASE_URL` points the OpenAI SDK at any OpenAI-compatible endpoint.
+Currently configured for **OpenRouter**. One requirement is non-negotiable: the
+endpoint must honour `response_format` with a strict `json_schema`, because both
+the planner and the evaluator depend on it.
+
+Some endpoints accept that parameter and silently ignore it, returning prose
+with an HTTP 200 — measured on NVIDIA NIM, where `meta/llama-3.2-*` did exactly
+this while `openai/gpt-oss-*` honoured it. An aggregator makes this *more*
+likely, not less, because one model id can be routed to providers with
+different capabilities; `LLM_REQUIRE_STRUCTURED_OUTPUT=1` sends
+`provider.require_parameters` so OpenRouter declines to route us to one that
+cannot comply.
+
+Check any new model before spending a run on it:
+
+```bash
+npm run check:endpoint -- --model openai/gpt-4.1
+```
+
+HONOURED means usable. IGNORED cannot be fixed by prompting — choose another
+model.
+
 Plus business questions raised in the PDF (§19 of the briefing), not blocking code:
 
 4. Do we accept that we are not first? (Spur and Uxia already exist — see §8.)

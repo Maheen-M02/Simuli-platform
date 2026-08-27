@@ -43,7 +43,12 @@ if (!env.ok) {
 }
 
 const model = values.model ?? env.value.evaluatorModel;
-const client = createLlmClient(env.value.openaiApiKey, env.value.openaiBaseUrl);
+const client = createLlmClient(env.value.openaiApiKey, {
+    baseUrl: env.value.openaiBaseUrl,
+    requireStructuredOutput: env.value.requireStructuredOutput,
+    appTitle: env.value.appTitle,
+    appUrl: env.value.appUrl,
+  });
 const scenarios =
   values.scenario === undefined
     ? GOLDEN_SCENARIOS
@@ -59,6 +64,14 @@ type Row = ScenarioPrediction & {
   readonly expected: string;
   readonly produced: readonly string[];
   readonly policyActions: number;
+  /**
+   * Why the policy overrode the model. Essential when diagnosing a false
+   * negative: a genuine finding lost to our own enforcement is a very
+   * different problem from one the model never made.
+   */
+  readonly policyReasons: readonly string[];
+  /** How many fact ids the model cited, to spot a model that cites none. */
+  readonly citedFacts: number;
 };
 
 const rows: Row[] = [];
@@ -75,6 +88,8 @@ for (const scenario of scenarios) {
       predictedProductIssue: false,
       produced: [],
       policyActions: 0,
+      policyReasons: [],
+      citedFacts: 0,
       error: result.error,
     });
     if (values.json !== true) process.stdout.write(`  ${scenario.id}: ERRORED — ${result.error}\n`);
@@ -90,6 +105,8 @@ for (const scenario of scenarios) {
     predictedProductIssue: products.length > 0,
     produced: result.value.findings.map((f) => `${f.classification}: ${f.finding}`),
     policyActions: result.value.policyActions.length,
+    policyReasons: result.value.policyActions.map((a) => `${a.from} -> ${a.to}: ${a.reason}`),
+    citedFacts: result.value.findings.reduce((total, f) => total + f.evidenceRefs.length, 0),
   };
   rows.push(row);
 

@@ -59,8 +59,30 @@ function looksLikeIgnoredSchema(content: string): boolean {
   return trimmed !== '' && !trimmed.startsWith('{') && !trimmed.startsWith('[');
 }
 
-export function createLlmClient(apiKey: string, baseUrl?: string): LlmClient {
-  const client = new OpenAI({ apiKey, ...(baseUrl === undefined ? {} : { baseURL: baseUrl }) });
+export type ClientOptions = {
+  readonly baseUrl?: string | undefined;
+  /**
+   * Send `provider.require_parameters`. Only meaningful on an aggregator, which
+   * may serve one model id from several upstream providers whose
+   * structured-output support differs. Off by default: OpenAI itself rejects
+   * request fields it does not recognise.
+   */
+  readonly requireStructuredOutput?: boolean;
+  readonly appTitle?: string | undefined;
+  readonly appUrl?: string | undefined;
+};
+
+export function createLlmClient(apiKey: string, options: ClientOptions = {}): LlmClient {
+  // Attribution headers are OpenRouter's convention; other endpoints ignore them.
+  const headers: Record<string, string> = {};
+  if (options.appTitle !== undefined) headers['X-Title'] = options.appTitle;
+  if (options.appUrl !== undefined) headers['HTTP-Referer'] = options.appUrl;
+
+  const client = new OpenAI({
+    apiKey,
+    ...(options.baseUrl === undefined ? {} : { baseURL: options.baseUrl }),
+    ...(Object.keys(headers).length === 0 ? {} : { defaultHeaders: headers }),
+  });
 
   return {
     async completeJson(request) {
@@ -72,6 +94,13 @@ export function createLlmClient(apiKey: string, baseUrl?: string): LlmClient {
           const response = await client.chat.completions.create({
             model: request.model,
             temperature: request.temperature ?? 0.4,
+            // Not part of the OpenAI API. An aggregator reads it and declines to
+            // route us to a provider that cannot honour the schema we sent —
+            // which is the difference between a loud failure and a silent
+            // downgrade to prose.
+            ...(options.requireStructuredOutput === true
+              ? { provider: { require_parameters: true } }
+              : {}),
             messages: [
               { role: 'system', content: request.system },
               { role: 'user', content: request.user },

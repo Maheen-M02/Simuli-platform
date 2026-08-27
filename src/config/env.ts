@@ -24,6 +24,20 @@ const EnvSchema = z.object({
    * the constraint any such endpoint has to meet.
    */
   OPENAI_BASE_URL: z.string().url().optional(),
+  /**
+   * Ask the endpoint to route only to providers that support the parameters we
+   * send. OpenRouter serves one model id from several upstream providers whose
+   * structured-output support differs, so without this a run can be routed to
+   * one that ignores the schema. Off by default: OpenAI rejects unknown
+   * request fields.
+   */
+  LLM_REQUIRE_STRUCTURED_OUTPUT: z
+    .string()
+    .optional()
+    .transform((value) => value !== undefined && value !== '0' && value.toLowerCase() !== 'false'),
+  /** Optional attribution, shown on the OpenRouter activity page. */
+  OPENROUTER_APP_TITLE: z.string().optional(),
+  OPENROUTER_APP_URL: z.string().url().optional(),
   OPENAI_PLANNER_MODEL: z.string().min(1).default('gpt-4.1'),
   OPENAI_EVALUATOR_MODEL: z.string().min(1).default('gpt-4.1'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
@@ -37,6 +51,10 @@ export type Env = {
   readonly openaiApiKey: string;
   /** Undefined means OpenAI's own API. */
   readonly openaiBaseUrl: string | undefined;
+  /** Send provider.require_parameters, so a schema-blind provider is not used. */
+  readonly requireStructuredOutput: boolean;
+  readonly appTitle: string | undefined;
+  readonly appUrl: string | undefined;
   readonly plannerModel: string;
   readonly evaluatorModel: string;
   readonly logLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error';
@@ -69,6 +87,9 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Result<Env, st
   return ok({
     openaiApiKey: parsed.data.OPENAI_API_KEY,
     openaiBaseUrl: parsed.data.OPENAI_BASE_URL,
+    requireStructuredOutput: parsed.data.LLM_REQUIRE_STRUCTURED_OUTPUT,
+    appTitle: parsed.data.OPENROUTER_APP_TITLE,
+    appUrl: parsed.data.OPENROUTER_APP_URL,
     plannerModel: parsed.data.OPENAI_PLANNER_MODEL,
     evaluatorModel: parsed.data.OPENAI_EVALUATOR_MODEL,
     logLevel: parsed.data.LOG_LEVEL,

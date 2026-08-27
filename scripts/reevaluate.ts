@@ -24,7 +24,12 @@ const record = db.loadSession(process.argv[2] ?? '');
 if (record === null) throw new Error('no such session');
 
 const result = await evaluateSession(record, {
-  client: createLlmClient(env.value.openaiApiKey, env.value.openaiBaseUrl),
+  client: createLlmClient(env.value.openaiApiKey, {
+    baseUrl: env.value.openaiBaseUrl,
+    requireStructuredOutput: env.value.requireStructuredOutput,
+    appTitle: env.value.appTitle,
+    appUrl: env.value.appUrl,
+  }),
   model: process.argv[3] ?? env.value.evaluatorModel,
   onRejectedFindings: (f) => console.log(`(discarded ${f.length} uncitable)`),
 });

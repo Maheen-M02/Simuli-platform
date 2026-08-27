@@ -65,7 +65,13 @@ export async function runSimulation(
     : null;
 
   const llmClient =
-    deps.llmClient ?? createLlmClient(deps.env.openaiApiKey, deps.env.openaiBaseUrl);
+    deps.llmClient ??
+    createLlmClient(deps.env.openaiApiKey, {
+      baseUrl: deps.env.openaiBaseUrl,
+      requireStructuredOutput: deps.env.requireStructuredOutput,
+      appTitle: deps.env.appTitle,
+      appUrl: deps.env.appUrl,
+    });
   const planner =
     deps.planner ?? createModelPlanner({ client: llmClient, model: deps.env.plannerModel });
 
