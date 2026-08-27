@@ -84,7 +84,15 @@ Rules:
   contradict them.
 - A run where nothing went wrong should produce few findings or none. Do not
   manufacture problems to fill space.
-- Judge goalAchieved from the evidence, not from what the customer claimed.`;
+- Judge goalAchieved from the evidence, not from what the customer claimed.
+- What the customer believed and expected is a guess they made at the time, not
+  a fact about the product. They routinely misdiagnose why something happened.
+  Evidence is what the page actually showed. Never turn a customer's stated
+  theory into a product finding unless the pages themselves bear it out.
+- A message on the page persists until the page is re-rendered. A customer
+  seeing the same error after fixing the input has usually not triggered a new
+  error; they are looking at the old one. Do not report that as the product
+  rejecting valid input.`;
 
 /** The record, rendered for the model. Step numbers here are what may be cited. */
 export function renderTranscript(record: SessionRecord): string {
@@ -106,8 +114,12 @@ export function renderTranscript(record: SessionRecord): string {
 
     if (step.action !== null) {
       lines.push(`Did: ${describeAction(step.action)}`);
-      lines.push(`Reasoning: ${step.action.reasoning}`);
-      lines.push(`Expected: ${step.action.expectation}`);
+      // Labelled as belief, not fact. On a real run the evaluator read two of
+      // these as product behaviour and filed false findings: the customer had
+      // guessed at why a stale error message was still on screen, and was wrong
+      // both times.
+      lines.push(`Believed at the time (may be mistaken): ${step.action.reasoning}`);
+      lines.push(`Expected to happen: ${step.action.expectation}`);
 
       const result = step.result;
       if (result !== null) {

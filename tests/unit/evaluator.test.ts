@@ -277,8 +277,11 @@ describe('transcript rendering', () => {
     const transcript = renderTranscript(record([step(0), step(1)]));
     expect(transcript).toContain('--- Step 0 ---');
     expect(transcript).toContain('--- Step 1 ---');
-    expect(transcript).toContain('Expected: something happens');
-    expect(transcript).toContain('Reasoning: because');
+    expect(transcript).toContain('Expected to happen: something happens');
+    // The customer's reasoning must be presented as a belief. Unlabelled, the
+    // evaluator read two such guesses as product behaviour on a real run and
+    // filed findings that were simply false.
+    expect(transcript).toContain('Believed at the time (may be mistaken): because');
   });
 
   it('shows failures with their kind', () => {
