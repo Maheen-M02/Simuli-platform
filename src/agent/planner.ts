@@ -51,6 +51,27 @@ export type PlannerInput = {
 export type Planner = (input: PlannerInput) => Promise<Result<Action, string>>;
 
 /**
+ * How often the model produced something we could not use.
+ *
+ * `invalidActions` counts replies that failed Zod validation. `recoveredActions`
+ * counts those that then validated on the retry. The pair matters for comparing
+ * providers: a model that is wrong once and self-corrects is usable, while one
+ * that is wrong twice costs a step and a recorded planner failure.
+ */
+export type PlannerStats = {
+  readonly calls: number;
+  readonly invalidActions: number;
+  readonly recoveredActions: number;
+  readonly unusable: number;
+  readonly transportFailures: number;
+};
+
+export type ModelPlanner = {
+  readonly planner: Planner;
+  stats(): PlannerStats;
+};
+
+/**
  * The production planner: prompt the model, then validate hard.
  *
  * The model's answer is untrusted input. It is asked for a particular shape,
@@ -66,10 +87,19 @@ export function createModelPlanner(options: {
   readonly client: LlmClient;
   readonly model: string;
   readonly maxSchemaRetries?: number;
-}): Planner {
+  readonly maxOutputTokens?: number;
+}): ModelPlanner {
   const maxSchemaRetries = options.maxSchemaRetries ?? 1;
 
-  return async (input) => {
+  let calls = 0;
+  let invalidActions = 0;
+  let recoveredActions = 0;
+  let unusable = 0;
+  let transportFailures = 0;
+
+  const planner: Planner = async (input) => {
+    calls += 1;
+    let sawInvalid = false;
     const system = buildSystemPrompt(input);
     let user = buildUserPrompt(input);
 
@@ -83,10 +113,13 @@ export function createModelPlanner(options: {
         // One action plus its reasoning is a few hundred tokens. Asking for the
         // client's larger default reserves budget we will never use, which a
         // metered endpoint charges for and a prepaid one refuses outright.
-        maxOutputTokens: 1024,
+        maxOutputTokens: options.maxOutputTokens ?? 1024,
       });
 
-      if (!response.ok) return err(response.error);
+      if (!response.ok) {
+        transportFailures += 1;
+        return err(response.error);
+      }
 
       const envelope = response.value;
       const decision =
@@ -95,13 +128,20 @@ export function createModelPlanner(options: {
           : envelope;
 
       const parsed = ActionSchema.safeParse(decision);
-      if (parsed.success) return ok(parsed.data);
+      if (parsed.success) {
+        if (sawInvalid) recoveredActions += 1;
+        return ok(parsed.data);
+      }
+
+      sawInvalid = true;
+      invalidActions += 1;
 
       const issues = parsed.error.issues
         .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
         .join('; ');
 
       if (attempt === maxSchemaRetries) {
+        unusable += 1;
         return err(`The model's action did not validate: ${issues}`);
       }
 
@@ -113,5 +153,10 @@ Answer again, using only the allowed action shapes and only refs listed above.`;
 
     // Unreachable: the loop above always returns.
     return err('The planner produced no answer.');
+  };
+
+  return {
+    planner,
+    stats: () => ({ calls, invalidActions, recoveredActions, unusable, transportFailures }),
   };
 }

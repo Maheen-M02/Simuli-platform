@@ -39,6 +39,25 @@ const EnvSchema = z.object({
   OPENROUTER_APP_TITLE: z.string().optional(),
   OPENROUTER_APP_URL: z.string().url().optional(),
   OPENAI_PLANNER_MODEL: z.string().min(1).default('gpt-4.1'),
+  /**
+   * NVIDIA's OpenAI-compatible endpoint, for benchmarking a second provider.
+   *
+   * Optional: absent simply means NVIDIA cannot be benchmarked, which the
+   * benchmark reports as a fact about the run rather than failing halfway.
+   */
+  NVIDIA_API_KEY: z.string().optional(),
+  NVIDIA_MODEL: z.string().min(1).default('nvidia/llama-3.1-nemotron-ultra-253b-v1'),
+  /**
+   * Cap on the planner's reply. One action plus reasoning is a few hundred
+   * tokens; reserving more is billed by a metered endpoint and refused outright
+   * by a prepaid one.
+   */
+  PLANNER_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(8192).default(1024),
+  /** Per-million-token rates, for costing a benchmark. Never guessed. */
+  OPENAI_COST_INPUT_PER_M: z.coerce.number().nonnegative().optional(),
+  OPENAI_COST_OUTPUT_PER_M: z.coerce.number().nonnegative().optional(),
+  NVIDIA_COST_INPUT_PER_M: z.coerce.number().nonnegative().optional(),
+  NVIDIA_COST_OUTPUT_PER_M: z.coerce.number().nonnegative().optional(),
   OPENAI_EVALUATOR_MODEL: z.string().min(1).default('gpt-4.1'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
   HEADLESS: z
@@ -57,6 +76,12 @@ export type Env = {
   readonly appUrl: string | undefined;
   readonly plannerModel: string;
   readonly evaluatorModel: string;
+  /** Undefined means NVIDIA is not configured for this machine. */
+  readonly nvidiaApiKey: string | undefined;
+  readonly nvidiaModel: string;
+  readonly plannerMaxOutputTokens: number;
+  readonly openaiRates: { inputPerMillion: number; outputPerMillion: number } | undefined;
+  readonly nvidiaRates: { inputPerMillion: number; outputPerMillion: number } | undefined;
   readonly logLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error';
   readonly headless: boolean;
   /** Name -> value, e.g. PASSWORD -> the actual password. */
@@ -92,6 +117,26 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): Result<Env, st
     appUrl: parsed.data.OPENROUTER_APP_URL,
     plannerModel: parsed.data.OPENAI_PLANNER_MODEL,
     evaluatorModel: parsed.data.OPENAI_EVALUATOR_MODEL,
+    nvidiaApiKey: parsed.data.NVIDIA_API_KEY,
+    nvidiaModel: parsed.data.NVIDIA_MODEL,
+    plannerMaxOutputTokens: parsed.data.PLANNER_MAX_OUTPUT_TOKENS,
+    // Both halves of a rate must be present, or the pair is meaningless.
+    openaiRates:
+      parsed.data.OPENAI_COST_INPUT_PER_M === undefined ||
+      parsed.data.OPENAI_COST_OUTPUT_PER_M === undefined
+        ? undefined
+        : {
+            inputPerMillion: parsed.data.OPENAI_COST_INPUT_PER_M,
+            outputPerMillion: parsed.data.OPENAI_COST_OUTPUT_PER_M,
+          },
+    nvidiaRates:
+      parsed.data.NVIDIA_COST_INPUT_PER_M === undefined ||
+      parsed.data.NVIDIA_COST_OUTPUT_PER_M === undefined
+        ? undefined
+        : {
+            inputPerMillion: parsed.data.NVIDIA_COST_INPUT_PER_M,
+            outputPerMillion: parsed.data.NVIDIA_COST_OUTPUT_PER_M,
+          },
     logLevel: parsed.data.LOG_LEVEL,
     headless: parsed.data.HEADLESS,
     secrets: collectSecrets(source),

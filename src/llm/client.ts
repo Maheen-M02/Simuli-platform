@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import { err, ok, type Result } from '../types/shared.ts';
+import type { CallUsage } from './usage.ts';
 
 /**
  * The one place model calls are made.
@@ -86,6 +87,22 @@ export type ClientOptions = {
   readonly requireStructuredOutput?: boolean;
   readonly appTitle?: string | undefined;
   readonly appUrl?: string | undefined;
+  /**
+   * Called after every attempt, successful or not.
+   *
+   * Additive instrumentation: without it the client behaves exactly as before,
+   * which is what keeps the existing baseline comparable. Never receives the
+   * key, the prompt or the reply — only counts and timings.
+   */
+  readonly onUsage?: (usage: CallUsage) => void;
+  /**
+   * Extra request fields, for a provider whose structured output needs them.
+   *
+   * Deliberately opaque and not interpreted here: provider quirks belong in the
+   * provider, and the semantic prompt must stay identical across providers or
+   * the comparison measures two experiments at once.
+   */
+  readonly extraBody?: Record<string, unknown>;
 };
 
 export function createLlmClient(apiKey: string, options: ClientOptions = {}): LlmClient {
@@ -106,6 +123,7 @@ export function createLlmClient(apiKey: string, options: ClientOptions = {}): Ll
       let lastError = 'The model call failed.';
 
       for (let attempt = 0; attempt < attempts; attempt++) {
+        const startedAt = Date.now();
         try {
           const response = await client.chat.completions.create({
             model: request.model,
@@ -118,6 +136,7 @@ export function createLlmClient(apiKey: string, options: ClientOptions = {}): Ll
             ...(options.requireStructuredOutput === true
               ? { provider: { require_parameters: true } }
               : {}),
+            ...(options.extraBody ?? {}),
             messages: [
               { role: 'system', content: request.system },
               { role: 'user', content: request.user },
@@ -130,6 +149,16 @@ export function createLlmClient(apiKey: string, options: ClientOptions = {}): Ll
                 schema: request.jsonSchema,
               },
             },
+          });
+
+          const reported = (
+            response as { usage?: { prompt_tokens?: number; completion_tokens?: number } }
+          ).usage;
+          options.onUsage?.({
+            inputTokens: reported?.prompt_tokens ?? null,
+            outputTokens: reported?.completion_tokens ?? null,
+            latencyMs: Date.now() - startedAt,
+            ok: true,
           });
 
           const choice = response.choices[0];
@@ -163,6 +192,14 @@ export function createLlmClient(apiKey: string, options: ClientOptions = {}): Ll
             continue;
           }
         } catch (caught) {
+          // A failed call still consumed time, and on some endpoints tokens.
+          // Dropping it would understate the cost of an unreliable provider.
+          options.onUsage?.({
+            inputTokens: null,
+            outputTokens: null,
+            latencyMs: Date.now() - startedAt,
+            ok: false,
+          });
           lastError = caught instanceof Error ? caught.message : String(caught);
           if (!isRetryable(caught)) return err(lastError);
         }

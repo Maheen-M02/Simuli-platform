@@ -22,7 +22,8 @@
     "validate:real": "tsx scripts/real-world-run.ts",
     "fixture:freightflow": "tsx fixtures/freightflow/serve.ts",
     "simulate": "tsx scripts/simulate.ts",
-    "compare": "tsx scripts/compare.ts"
+    "compare": "tsx scripts/compare.ts",
+    "benchmark:models": "tsx scripts/benchmark-models.ts"
   },
   "dependencies": {
     "openai": "^6.9.0",

@@ -41,9 +41,18 @@ export type SimulationResult = {
 export type SimulationDeps = {
   readonly env: Env;
   readonly logger?: Logger;
-  /** Overridden in tests to avoid a model call. */
+  /** Overridden in tests to avoid a model call, and by the benchmark to vary provider. */
   readonly planner?: Planner;
   readonly llmClient?: LlmClient;
+  /**
+   * Client for the evaluator, when it must differ from the planner's.
+   *
+   * The benchmark needs this. Varying the planner's provider is the experiment;
+   * letting the evaluator vary with it would change two things at once and make
+   * the findings incomparable between arms. So the evaluator is pinned to one
+   * provider while the planner changes underneath it.
+   */
+  readonly evaluatorClient?: LlmClient;
   readonly db?: Db;
   readonly sessionId?: string;
   readonly now?: () => number;
@@ -73,7 +82,7 @@ export async function runSimulation(
       appUrl: deps.env.appUrl,
     });
   const planner =
-    deps.planner ?? createModelPlanner({ client: llmClient, model: deps.env.plannerModel });
+    deps.planner ?? createModelPlanner({ client: llmClient, model: deps.env.plannerModel }).planner;
 
   const session = await startSession(config.startUrl, {
     headless: config.headless,
@@ -151,7 +160,7 @@ export async function runSimulation(
 
   if (config.evaluate) {
     const result = await evaluateSession(record, {
-      client: llmClient,
+      client: deps.evaluatorClient ?? llmClient,
       model: deps.env.evaluatorModel,
       onRejectedFindings: (findings) => {
         rejectedFindings.push(...findings);

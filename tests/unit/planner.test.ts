@@ -63,7 +63,7 @@ function fakeClient(...payloads: unknown[]): { client: LlmClient; calls: string[
   };
 }
 
-const planner = (client: LlmClient) => createModelPlanner({ client, model: 'test-model' });
+const planner = (client: LlmClient) => createModelPlanner({ client, model: 'test-model' }).planner;
 
 describe('model planner', () => {
   it('accepts a well-formed decision', async () => {
