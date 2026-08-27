@@ -26,6 +26,8 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS sessions (
   id                 TEXT PRIMARY KEY,
   start_url          TEXT NOT NULL,
+  -- Holds the whole CustomerContext. The column name is historical: it once
+  -- held only a persona, and renaming it would need a migration for no gain.
   persona_json       TEXT NOT NULL,
   goal_json          TEXT NOT NULL,
   planner_model      TEXT NOT NULL,
@@ -96,7 +98,7 @@ export function openDb(path: string): Db {
       insertSessionStmt.run(
         record.id,
         record.startUrl,
-        JSON.stringify(record.persona),
+        JSON.stringify(record.context),
         JSON.stringify(record.goal),
         record.plannerModel,
         record.startedAt,
@@ -145,7 +147,7 @@ export function openDb(path: string): Db {
       return {
         id: String(row['id']),
         startUrl: String(row['start_url']),
-        persona: JSON.parse(String(row['persona_json'])),
+        context: JSON.parse(String(row['persona_json'])),
         goal: JSON.parse(String(row['goal_json'])),
         plannerModel: String(row['planner_model']),
         startedAt: Number(row['started_at']),

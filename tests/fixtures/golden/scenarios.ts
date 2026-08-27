@@ -1,6 +1,7 @@
 import { ActionSchema, type Action } from '../../../src/actions/schema.ts';
 import { GoalSchema } from '../../../src/goals/schema.ts';
-import { PersonaSchema, type Persona } from '../../../src/personas/schema.ts';
+import { PersonaSchema } from '../../../src/personas/schema.ts';
+import { CustomerContextSchema, type CustomerContext } from '../../../src/personas/context.ts';
 import type { SessionRecord, StepRecord, Outcome, TerminationReason } from '../../../src/sessions/types.ts';
 import type { ActionResult, ErrorKind } from '../../../src/types/shared.ts';
 import type { Classification } from '../../../src/evaluation/schema.ts';
@@ -24,11 +25,17 @@ import type { Classification } from '../../../src/evaluation/schema.ts';
  * matters is that no PRODUCT_ISSUE finding is produced.
  */
 
-const PERSONA: Persona = PersonaSchema.parse({
-  name: 'Sam, a small business owner',
-  background: 'Runs a six-person consultancy. Comfortable with everyday software but not technical.',
-  techLevel: 'average',
-  patience: 'medium',
+const CONTEXT: CustomerContext = CustomerContextSchema.parse({
+  persona: PersonaSchema.parse({
+    name: 'Sam, a small business owner',
+    background: 'Runs a six-person consultancy. Comfortable with everyday software but not technical.',
+    techLevel: 'average',
+    patience: 'medium',
+  }),
+  background: 'Evaluating the product after a peer recommended it.',
+  motivation: 'Wants to know whether it is worth switching.',
+  expectations: ['it should be usable without reading documentation'],
+  constraints: ['will not enter real payment details'],
 });
 
 const SITE = 'http://shop.test';
@@ -119,7 +126,7 @@ function scenario(input: {
     record: {
       id: `golden-${input.id}`,
       startUrl: SITE,
-      persona: PERSONA,
+      context: CONTEXT,
       goal: GoalSchema.parse({ description: input.goal }),
       plannerModel: 'golden-fixture',
       startedAt: 1_700_000_000_000,

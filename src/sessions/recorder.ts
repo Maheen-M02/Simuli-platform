@@ -1,7 +1,7 @@
 import type { Action } from '../actions/schema.ts';
 import type { Goal } from '../goals/schema.ts';
 import type { Observation } from '../observations/types.ts';
-import type { Persona } from '../personas/schema.ts';
+import type { CustomerContext } from '../personas/context.ts';
 import type { Db } from '../persistence/db.ts';
 import type { ActionResult } from '../types/shared.ts';
 import type {
@@ -39,7 +39,7 @@ export type Recorder = {
 export type RecorderOptions = {
   readonly sessionId: string;
   readonly startUrl: string;
-  readonly persona: Persona;
+  readonly context: CustomerContext;
   readonly goal: Goal;
   readonly plannerModel: string;
   readonly db: Db;
@@ -68,7 +68,7 @@ export function createRecorder(options: RecorderOptions): Recorder {
   let record: SessionRecord = {
     id: options.sessionId,
     startUrl: options.startUrl,
-    persona: options.persona,
+    context: options.context,
     goal: options.goal,
     plannerModel: options.plannerModel,
     startedAt: now(),

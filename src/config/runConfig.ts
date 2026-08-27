@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PersonaSchema } from '../personas/schema.ts';
+import { CustomerContextSchema } from '../personas/context.ts';
 import { GoalSchema } from '../goals/schema.ts';
 
 /**
@@ -31,10 +31,18 @@ export const RunConfigSchema = z
         message: 'startUrl must be http or https',
       }),
     goal: GoalSchema,
-    persona: PersonaSchema,
+    context: CustomerContextSchema,
     limits: LimitsSchema.prefault({}),
     /** Extra origins the run may follow links to. The start origin is implicit. */
     allowedOrigins: z.array(z.string().url()).max(20).default([]),
+    /**
+     * Permit sibling subdomains of the start host.
+     *
+     * Off by default so the fixture tests stay exact, and on for real runs:
+     * products routinely bounce login to an auth subdomain, and refusing that
+     * redirect makes our sandbox boundary look like a product dead end.
+     */
+    allowSubdomains: z.boolean().default(false),
     /** Root for the database and artifacts. Gitignored. */
     dataDir: z.string().min(1).default('data'),
     headless: z.boolean().default(true),

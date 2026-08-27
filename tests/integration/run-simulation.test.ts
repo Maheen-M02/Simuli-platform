@@ -6,6 +6,7 @@ import { startFixtureSite, type FixtureSite } from '../fixtures/site/server.ts';
 import { runSimulation } from '../../src/runSimulation.ts';
 import { RunConfigSchema } from '../../src/config/runConfig.ts';
 import { DEFAULT_PERSONA } from '../../src/personas/schema.ts';
+import { CustomerContextSchema } from '../../src/personas/context.ts';
 import { openDb } from '../../src/persistence/db.ts';
 import { ok, type Result } from '../../src/types/shared.ts';
 import { ActionSchema, type Action } from '../../src/actions/schema.ts';
@@ -36,6 +37,12 @@ const env: Env = {
   headless: true,
   secrets: new Map([['PASSWORD', 'correct-horse-9']]),
 };
+
+const CONTEXT = CustomerContextSchema.parse({
+  persona: DEFAULT_PERSONA,
+  motivation: 'Wants to send a first invoice today.',
+  expectations: ['it should not need a card up front'],
+});
 
 const common = { reasoning: 'r', expectation: 'e' };
 
@@ -177,7 +184,7 @@ describe('runSimulation', () => {
     const config = RunConfigSchema.parse({
       startUrl: site.url,
       goal: { description: 'Create my first invoice' },
-      persona: DEFAULT_PERSONA,
+      context: CONTEXT,
       dataDir,
       limits: { maxSteps: 20 },
     });
@@ -241,7 +248,7 @@ describe('runSimulation', () => {
     const config = RunConfigSchema.parse({
       startUrl: `${site.url}/pricing`,
       goal: { description: 'Understand the pricing' },
-      persona: DEFAULT_PERSONA,
+      context: CONTEXT,
       dataDir,
       screenshots: false,
     });
@@ -275,7 +282,7 @@ describe('runSimulation', () => {
     const config = RunConfigSchema.parse({
       startUrl: `${site.url}/pricing`,
       goal: { description: 'Look at pricing' },
-      persona: DEFAULT_PERSONA,
+      context: CONTEXT,
       dataDir,
       screenshots: false,
       evaluate: false,

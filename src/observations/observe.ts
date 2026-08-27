@@ -11,8 +11,17 @@ import { redactDeep, type Redactor } from './redact.ts';
  * an interaction with the product.
  */
 
-/** Beyond this, a page is a wall of text and the model reasons worse, not better. */
-const DEFAULT_NODE_BUDGET = 200;
+/**
+ * Beyond this, a page is a wall of text and the model reasons worse, not better.
+ *
+ * Raised from 200 for real applications: the fixture's pages have a dozen nodes
+ * and a real dashboard has hundreds. Truncation is not a cosmetic loss — the
+ * agent would reason about a page with its lower half amputated, and a feature
+ * it could not find because we hid it reads exactly like a feature the product
+ * failed to surface. The snapshot reports `truncated` so that confusion is at
+ * least visible.
+ */
+const DEFAULT_NODE_BUDGET = 400;
 
 export type SettleOptions = {
   /** Hard cap on waiting for the page to stop moving. */
@@ -31,6 +40,27 @@ export async function settle(page: Page, options: SettleOptions): Promise<void> 
     // A page that never finishes loading is itself an observation; carry on and
     // let the agent see whatever is rendered.
   }
+
+  // On a client-rendered application `domcontentloaded` fires against an empty
+  // root element, so without this we would snapshot a blank page and the agent
+  // would conclude the product is broken. Waits for something interactive or
+  // some real text to exist, then gives up quietly — a genuinely empty page is
+  // itself a finding, and must still be observable.
+  try {
+    await page.waitForFunction(
+      () => {
+        const body = document.body;
+        if (body === null) return false;
+        if (body.querySelector('a[href], button, input, select, textarea') !== null) return true;
+        return (body.innerText ?? '').trim().length > 40;
+      },
+      undefined,
+      { timeout: Math.min(options.timeoutMs, 4000) },
+    );
+  } catch {
+    // Nothing rendered in time. Observe whatever is there.
+  }
+
   try {
     await page.waitForLoadState('networkidle', { timeout: Math.min(options.timeoutMs, 2000) });
   } catch {

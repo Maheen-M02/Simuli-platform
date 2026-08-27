@@ -4,6 +4,7 @@ import { err, ok, type Result } from '../types/shared.ts';
 import { computeFacts, describeFacts } from './deterministic.ts';
 import { deriveEvidence, renderEvidence, type EvidenceLedger } from './evidence.ts';
 import { applyEvidencePolicy } from './policy.ts';
+import { WOULD_PAY_VERDICTS } from './verdict.ts';
 import {
   CLASSIFICATIONS,
   CONFIDENCES,
@@ -89,8 +90,42 @@ const EVALUATION_JSON_SCHEMA = {
         additionalProperties: false,
       },
     },
+    customerVerdict: {
+      type: 'object',
+      description:
+        'How this particular customer would feel about the experience. An ' +
+        'experimental signal, not a prediction of real behaviour.',
+      properties: {
+        satisfactionScore: {
+          type: 'integer',
+          description: '1 = would abandon and warn others, 5 = would recommend.',
+        },
+        satisfactionReason: { type: 'string' },
+        wouldUseAgain: { type: 'boolean' },
+        wouldUseAgainReason: { type: 'string' },
+        wouldPay: {
+          type: 'string',
+          enum: [...WOULD_PAY_VERDICTS],
+          description:
+            'NOT_APPLICABLE unless the run actually reached something bearing on ' +
+            'price or value. Most runs do not.',
+        },
+        wouldPayReason: { type: 'string' },
+        confidence: { type: 'string', enum: ['low', 'medium', 'high'] },
+      },
+      required: [
+        'satisfactionScore',
+        'satisfactionReason',
+        'wouldUseAgain',
+        'wouldUseAgainReason',
+        'wouldPay',
+        'wouldPayReason',
+        'confidence',
+      ],
+      additionalProperties: false,
+    },
   },
-  required: ['goalAchieved', 'summary', 'findings'],
+  required: ['goalAchieved', 'summary', 'findings', 'customerVerdict'],
   additionalProperties: false,
 } as const;
 
@@ -135,7 +170,19 @@ Rules:
   classification is INCONCLUSIVE.
 - A run where nothing went wrong should produce no findings. Do not manufacture
   problems to fill space.
-- Judge goalAchieved from the facts, not from what the customer claimed.`;
+- Judge goalAchieved from the facts, not from what the customer claimed.
+
+Finally, give the customer's own verdict: how this specific person, with the
+expectations and constraints they arrived with, would feel about what happened.
+
+- Answer as an assessment of this described person, not of the product in
+  general. A tolerant customer and an impatient one rate the same run
+  differently, and that difference is the point.
+- wouldPay must be NOT_APPLICABLE unless the run actually reached something
+  bearing on price or value. Most runs never do, and a forced yes/no there is
+  noise dressed up as a signal.
+- Set verdict confidence low when the run was short, ended in our own error, or
+  never exercised what the customer cared about.`;
 
 /** Renders the record for the model: computed facts, then the evidence ledger. */
 export function renderEvaluatorPrompt(record: SessionRecord, ledger: EvidenceLedger): string {
@@ -143,7 +190,15 @@ export function renderEvaluatorPrompt(record: SessionRecord, ledger: EvidenceLed
 
   return [
     `Goal the customer was given: ${record.goal.description}`,
-    `Who they were: ${record.persona.name} — ${record.persona.background}`,
+    `Who they were: ${record.context.persona.name} — ${record.context.persona.background}`,
+    record.context.background === '' ? '' : `Their situation: ${record.context.background}`,
+    record.context.motivation === '' ? '' : `Why they came: ${record.context.motivation}`,
+    record.context.expectations.length === 0
+      ? ''
+      : `What they expected: ${record.context.expectations.join('; ')}`,
+    record.context.constraints.length === 0
+      ? ''
+      : `What they could not change: ${record.context.constraints.join('; ')}`,
     `How the run ended: ${record.outcome ?? 'unknown'} (${record.terminationReason ?? 'unknown'})`,
     record.agentSummary === null ? '' : `What the customer said at the end: ${record.agentSummary}`,
     '',
@@ -206,6 +261,7 @@ export async function evaluateSession(
     findings: policy.findings,
     facts,
     policyActions: policy.actions,
+    customerVerdict: parsed.data.customerVerdict ?? null,
   });
 
   if (!evaluation.success) return err('The assembled evaluation did not validate.');

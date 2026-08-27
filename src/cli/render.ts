@@ -1,4 +1,5 @@
 import type { Evaluation, Finding } from '../evaluation/schema.ts';
+import { VERDICT_CAVEAT } from '../evaluation/verdict.ts';
 import type { SessionRecord } from '../sessions/types.ts';
 import { describeAction } from '../actions/schema.ts';
 
@@ -18,7 +19,6 @@ const DIM = '[2m';
 const RED = '[31m';
 const GREEN = '[32m';
 const YELLOW = '[33m';
-const BLUE = '[34m';
 
 let colorEnabled = true;
 
@@ -55,7 +55,7 @@ export function renderRecord(record: SessionRecord): string {
 
   lines.push(paint(BOLD, 'Run'));
   lines.push(`  Goal      ${record.goal.description}`);
-  lines.push(`  Customer  ${record.persona.name}`);
+  lines.push(`  Customer  ${record.context.persona.name}`);
   lines.push(`  Outcome   ${paint(OUTCOME_COLOR[outcome] ?? '', outcome)} ${paint(DIM, `(${record.terminationReason ?? '—'})`)}`);
   lines.push(`  Steps     ${record.steps.length}`);
 
@@ -105,50 +105,65 @@ export function renderEvaluation(evaluation: Evaluation): string {
 
   if (evaluation.findings.length === 0) {
     lines.push(paint(DIM, '  Nothing got in the customer’s way.'));
-    return lines.join('\n');
   }
 
-  const order: Finding['severity'][] = ['high', 'medium', 'low'];
-  const sorted = [...evaluation.findings].sort(
-    (a, b) => order.indexOf(a.severity) - order.indexOf(b.severity),
-  );
+  // Grouped by whose problem it is, and product issues first. A reader skimming
+  // a report should not have to work out which findings are about their product
+  // and which are about our simulation — that separation is the report's whole
+  // claim to being worth reading.
+  const sections: readonly { readonly heading: string; readonly of: Finding['classification'] }[] = [
+    { heading: 'Product issues', of: 'PRODUCT_ISSUE' },
+    { heading: 'Agent misunderstandings (our simulation, not the product)', of: 'AGENT_MISUNDERSTANDING' },
+    { heading: 'Environment errors (our tooling)', of: 'ENVIRONMENT_ERROR' },
+    { heading: 'Inconclusive — the evidence would not settle it', of: 'INCONCLUSIVE' },
+  ];
 
-  for (const finding of sorted) {
-    const severity =
-      finding.severity === 'high'
-        ? paint(RED, 'high')
-        : finding.severity === 'medium'
-          ? paint(YELLOW, 'medium')
-          : paint(DIM, 'low');
+  const bySeverity: Finding['severity'][] = ['high', 'medium', 'low'];
 
-    // Classification is never hidden: a finding that is our fault says so, and
-    // one we could not settle says that rather than implying a product defect.
-    const label = CLASSIFICATION_LABEL[finding.classification];
-    const classification = paint(finding.classification === 'PRODUCT_ISSUE' ? BLUE : DIM, label);
+  for (const section of sections) {
+    const group = evaluation.findings
+      .filter((finding) => finding.classification === section.of)
+      .sort((a, b) => bySeverity.indexOf(a.severity) - bySeverity.indexOf(b.severity));
+    if (group.length === 0) continue;
 
-    lines.push(`  ${paint(BOLD, finding.finding)}  ${severity} · ${classification} · ${paint(DIM, `${finding.confidence} confidence`)}`);
-    lines.push(`    ${paint(DIM, 'Evidence:')} ${finding.evidence}`);
-    lines.push(`    ${paint(DIM, 'Or perhaps:')} ${finding.alternativeExplanation}`);
-    lines.push(`    ${paint(DIM, 'Suggested:')} ${finding.recommendation}`);
-    lines.push(
-      `    ${paint(DIM, `steps ${finding.supportingSteps.join(', ')} · ${finding.evidenceType} · affects ${finding.affectedPersona}`)}`,
-    );
-    lines.push('');
+    lines.push(paint(BOLD, `  ${section.heading}`), '');
+
+    for (const finding of group) {
+      const severity =
+        finding.severity === 'high'
+          ? paint(RED, 'high')
+          : finding.severity === 'medium'
+            ? paint(YELLOW, 'medium')
+            : paint(DIM, 'low');
+
+      lines.push(
+        `    ${paint(BOLD, finding.finding)}  ${severity} · ${paint(DIM, `${finding.confidence} confidence`)}`,
+      );
+      lines.push(`      ${paint(DIM, 'Evidence:')} ${finding.evidence}`);
+      lines.push(`      ${paint(DIM, 'Or perhaps:')} ${finding.alternativeExplanation}`);
+      lines.push(`      ${paint(DIM, 'Suggested:')} ${finding.recommendation}`);
+      lines.push(
+        `      ${paint(DIM, `steps ${finding.supportingSteps.join(', ')} · ${finding.evidenceType} · affects ${finding.affectedPersona}`)}`,
+      );
+      lines.push('');
+    }
   }
 
   const counts = new Map<Finding['classification'], number>();
   for (const finding of evaluation.findings) {
     counts.set(finding.classification, (counts.get(finding.classification) ?? 0) + 1);
   }
-  lines.push(
-    paint(
-      DIM,
-      '  ' +
-        [...counts.entries()]
-          .map(([classification, n]) => `${n} ${CLASSIFICATION_LABEL[classification]}`)
-          .join(', '),
-    ),
-  );
+  if (counts.size > 0) {
+    lines.push(
+      paint(
+        DIM,
+        '  ' +
+          [...counts.entries()]
+            .map(([classification, n]) => `${n} ${CLASSIFICATION_LABEL[classification]}`)
+            .join(', '),
+      ),
+    );
+  }
 
   // Overriding the model is a signal about our own reliability, so it is shown
   // rather than quietly applied.
@@ -161,6 +176,42 @@ export function renderEvaluation(evaluation: Evaluation): string {
       lines.push(paint(DIM, `    ${action.from} -> ${action.to}: ${action.reason}`));
     }
   }
+
+  lines.push(renderVerdict(evaluation));
+  return lines.join('\n');
+}
+
+/**
+ * The customer's verdict, and the caveat, together.
+ *
+ * The caveat is printed unconditionally and adjacent to the number, not in a
+ * footnote. A satisfaction score detached from "this is not a prediction of real
+ * behaviour" is exactly the artefact that gets pasted into a deck.
+ */
+export function renderVerdict(evaluation: Evaluation): string {
+  const verdict = evaluation.customerVerdict;
+  if (verdict === null) {
+    return ['', paint(BOLD, 'Customer verdict'), paint(DIM, '  Not produced for this run.'), ''].join('\n');
+  }
+
+  const stars = '●'.repeat(verdict.satisfactionScore) + '○'.repeat(5 - verdict.satisfactionScore);
+  const colour = verdict.satisfactionScore >= 4 ? GREEN : verdict.satisfactionScore <= 2 ? RED : YELLOW;
+
+  const lines = [
+    '',
+    `${paint(BOLD, 'Customer verdict')} ${paint(DIM, '(experimental)')}`,
+    '',
+    `  Satisfaction    ${paint(colour, stars)} ${verdict.satisfactionScore}/5`,
+    `                  ${verdict.satisfactionReason}`,
+    `  Would use again ${verdict.wouldUseAgain ? paint(GREEN, 'yes') : paint(RED, 'no')}`,
+    `                  ${verdict.wouldUseAgainReason}`,
+    `  Would pay       ${verdict.wouldPay === 'NOT_APPLICABLE' ? paint(DIM, 'not applicable') : verdict.wouldPay === 'YES' ? paint(GREEN, 'yes') : paint(RED, 'no')}`,
+    `                  ${verdict.wouldPayReason}`,
+    `  Confidence      ${verdict.confidence}`,
+    '',
+    paint(YELLOW, `  ${VERDICT_CAVEAT}`),
+    '',
+  ];
 
   return lines.join('\n');
 }

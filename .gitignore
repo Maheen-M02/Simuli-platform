@@ -37,3 +37,7 @@ desktop.ini
 # Scratch
 tmp/
 scratch/
+
+# Real-world run files may name internal staging hosts; the example is committed.
+runs/*
+!runs/example.json

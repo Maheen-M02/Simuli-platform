@@ -3,9 +3,14 @@ import { createModelPlanner, type PlannerInput } from '../../src/agent/planner.t
 import { buildSystemPrompt, buildUserPrompt } from '../../src/agent/prompt.ts';
 import type { LlmClient } from '../../src/llm/client.ts';
 import { DEFAULT_PERSONA, PersonaSchema } from '../../src/personas/schema.ts';
+import { CustomerContextSchema } from '../../src/personas/context.ts';
 import { GoalSchema } from '../../src/goals/schema.ts';
 import { err, ok } from '../../src/types/shared.ts';
 import type { Observation } from '../../src/observations/types.ts';
+
+/** Same persona as before, now inside the context envelope. */
+const CONTEXT = CustomerContextSchema.parse({ persona: DEFAULT_PERSONA });
+
 
 /**
  * The planner boundary, with a fake client. No API call happens here.
@@ -33,7 +38,7 @@ const observation: Observation = {
 };
 
 const input: PlannerInput = {
-  persona: DEFAULT_PERSONA,
+  context: CONTEXT,
   goal: GoalSchema.parse({ description: 'Create an account' }),
   observation,
   history: [],
@@ -194,7 +199,9 @@ describe('prompt construction', () => {
       background: 'Cautious buyer',
       wontDo: ['enter real card details'],
     });
-    expect(buildSystemPrompt({ ...input, persona })).toContain('enter real card details');
+    expect(
+      buildSystemPrompt({ ...input, context: CustomerContextSchema.parse({ persona }) }),
+    ).toContain('enter real card details');
   });
 });
 

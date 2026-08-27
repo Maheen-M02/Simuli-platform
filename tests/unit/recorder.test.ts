@@ -3,9 +3,14 @@ import { openDb } from '../../src/persistence/db.ts';
 import { createRecorder } from '../../src/sessions/recorder.ts';
 import { ActionSchema } from '../../src/actions/schema.ts';
 import { DEFAULT_PERSONA } from '../../src/personas/schema.ts';
+import { CustomerContextSchema } from '../../src/personas/context.ts';
 import { GoalSchema } from '../../src/goals/schema.ts';
 import type { Observation } from '../../src/observations/types.ts';
 import type { ActionResult } from '../../src/types/shared.ts';
+
+/** Same persona as before, now inside the context envelope. */
+const CONTEXT = CustomerContextSchema.parse({ persona: DEFAULT_PERSONA });
+
 
 /**
  * Recording is only useful if it survives the runs that go wrong. A run that
@@ -44,7 +49,7 @@ function setup(sessionId = 'run-1') {
   const recorder = createRecorder({
     sessionId,
     startUrl: 'http://site.test/',
-    persona: DEFAULT_PERSONA,
+    context: CONTEXT,
     goal,
     plannerModel: 'test-model',
     db,
@@ -139,7 +144,7 @@ describe('session recording', () => {
     expect(loaded?.outcome).toBe('SUCCESS');
     expect(loaded?.terminationReason).toBe('AGENT_FINISHED');
     expect(loaded?.agentSummary).toBe('Invoice INV-0001 was created.');
-    expect(loaded?.persona.name).toBe(DEFAULT_PERSONA.name);
+    expect(loaded?.context.persona.name).toBe(DEFAULT_PERSONA.name);
     expect(loaded?.goal.description).toBe('Send an invoice');
     expect(loaded?.plannerModel).toBe('test-model');
     expect(loaded?.steps[0]?.observation.screenshotPath).toBe('data/run-1/step-000.png');
@@ -169,7 +174,7 @@ describe('session recording', () => {
       const recorder = createRecorder({
         sessionId: id,
         startUrl: 'http://site.test/',
-        persona: DEFAULT_PERSONA,
+        context: CONTEXT,
         goal,
         plannerModel: 'test-model',
         db,

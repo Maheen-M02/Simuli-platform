@@ -1,0 +1,31 @@
+{
+  "url": "https://app.acme-staging.example/",
+  "permission": {
+    "environment": "staging",
+    "authorisedBy": "REPLACE — who authorised this, and how you can point at it later"
+  },
+  "goal": {
+    "description": "Sign up and send my first invoice",
+    "successCriteria": "An invoice exists with my client's name on it"
+  },
+  "customerContext": {
+    "persona": {
+      "name": "Priya, ops lead at a logistics firm",
+      "background": "Runs operations for a 40-person freight company. Comfortable with everyday software, not technical.",
+      "techLevel": "average",
+      "patience": "low",
+      "priorities": ["getting paid faster", "not being asked for a card up front"],
+      "wontDo": ["enter real payment details", "contact support to finish a basic task"]
+    },
+    "background": "Her team is outgrowing spreadsheets and she has budget approval this quarter.",
+    "motivation": "Needs to choose a tool before the quarter closes.",
+    "expectations": ["a trial without a card", "importing existing clients from CSV"],
+    "constraints": ["no admin rights on her laptop", "cannot enter real payment details"]
+  },
+  "credentialNames": [],
+  "allowedOrigins": [],
+  "allowSubdomains": true,
+  "maxSteps": 60,
+  "timeoutSeconds": 900,
+  "screenshots": true
+}

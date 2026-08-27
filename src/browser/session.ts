@@ -17,6 +17,16 @@ export type SessionOptions = {
   readonly headless: boolean;
   /** Origins the run may load. The start URL's origin is added automatically. */
   readonly allowedOrigins: readonly string[];
+  /**
+   * Also permit sibling subdomains of the start host.
+   *
+   * Necessary for any real application. Products routinely bounce login to
+   * `auth.example.com` or `accounts.example.com`, and under exact-origin
+   * matching that redirect is refused — which the agent then reads as a dead
+   * end in the product rather than a limit of our sandbox. Off by default so
+   * the fixture tests stay exact.
+   */
+  readonly allowSubdomains?: boolean;
   readonly viewport?: { readonly width: number; readonly height: number };
   /** Called whenever a request is refused, so the run record can show it. */
   readonly onBlockedNavigation?: (url: string) => void;
@@ -58,6 +68,33 @@ export function originOf(url: string): string | null {
   }
 }
 
+/**
+ * The last two labels of a host.
+ *
+ * Deliberately naive: it treats `example.co.uk` as `co.uk`, which is wrong. The
+ * consequence of being wrong is permitting more of a domain the operator has
+ * already pointed us at, which is why `allowSubdomains` is opt-in rather than
+ * the default. A public-suffix list is the correct fix and not worth the
+ * dependency for a local validation tool.
+ */
+function baseDomainOf(host: string): string {
+  const labels = host.split('.');
+  return labels.length <= 2 ? host : labels.slice(-2).join('.');
+}
+
+/** True when `url` belongs to the same site as `startUrl`, subdomains included. */
+export function isSameSite(startUrl: string, url: string): boolean {
+  try {
+    const start = new URL(startUrl);
+    const candidate = new URL(url);
+    if (candidate.protocol !== 'http:' && candidate.protocol !== 'https:') return false;
+    const base = baseDomainOf(start.hostname);
+    return candidate.hostname === base || candidate.hostname.endsWith(`.${base}`);
+  } catch {
+    return false;
+  }
+}
+
 export async function startSession(
   startUrl: string,
   options: SessionOptions,
@@ -91,6 +128,9 @@ export async function startSession(
     }
     const origin = originOf(request.url());
     if (origin !== null && allowedOrigins.has(origin)) return route.continue();
+    if (options.allowSubdomains === true && isSameSite(startUrl, request.url())) {
+      return route.continue();
+    }
 
     blocked.push(request.url());
     options.onBlockedNavigation?.(request.url());

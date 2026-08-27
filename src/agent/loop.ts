@@ -8,7 +8,7 @@ import { observe, settle } from '../observations/observe.ts';
 import type { Redactor } from '../observations/redact.ts';
 import { snapshotFingerprint, summarizeSnapshot } from '../observations/serialize.ts';
 import type { Observation } from '../observations/types.ts';
-import type { Persona } from '../personas/schema.ts';
+import type { CustomerContext } from '../personas/context.ts';
 import type { Recorder } from '../sessions/recorder.ts';
 import type { SessionRecord, TerminationReason } from '../sessions/types.ts';
 import type { ActionResult } from '../types/shared.ts';
@@ -45,7 +45,7 @@ export type LoopOptions = {
   readonly session: BrowserSession;
   readonly planner: Planner;
   readonly recorder: Recorder;
-  readonly persona: Persona;
+  readonly context: CustomerContext;
   readonly goal: Goal;
   readonly secrets: ReadonlyMap<string, string>;
   readonly redact: Redactor;
@@ -148,7 +148,7 @@ export async function runLoop(options: LoopOptions): Promise<SessionRecord> {
 
       // --- decide ----------------------------------------------------------
       const decision = await options.planner({
-        persona: options.persona,
+        context: options.context,
         goal: options.goal,
         observation,
         history,

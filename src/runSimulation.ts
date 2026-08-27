@@ -78,31 +78,57 @@ export async function runSimulation(
   const session = await startSession(config.startUrl, {
     headless: config.headless,
     allowedOrigins: config.allowedOrigins,
+    allowSubdomains: config.allowSubdomains,
     onBlockedNavigation: (url) => logger.info({ url }, 'refused a navigation outside the allowlist'),
   });
 
   let record: SessionRecord;
 
   try {
-    // The start URL is the one navigation we perform. From here the agent has
-    // to get around the way a customer does: by clicking.
-    await session.page.goto(config.startUrl, { waitUntil: 'domcontentloaded' });
-
+    // The recorder is created before the first navigation, so a target that
+    // cannot be reached at all still produces a session row with an explicit
+    // outcome. Every run terminates with a verdict; an unreachable host is an
+    // ordinary condition against a real application — a typo, a VPN, DNS — and
+    // must not surface as an uncaught exception.
     const recorder = createRecorder({
       sessionId,
       startUrl: config.startUrl,
-      persona: config.persona,
+      context: config.context,
       goal: config.goal,
       plannerModel: deps.env.plannerModel,
       db,
       ...(deps.now === undefined ? {} : { now: deps.now }),
     });
 
+    try {
+      // The start URL is the one navigation we perform. From here the agent has
+      // to get around the way a customer does: by clicking.
+      await session.page.goto(config.startUrl, { waitUntil: 'domcontentloaded' });
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
+      logger.error({ url: config.startUrl, err: message }, 'could not open the target');
+      record = recorder.finish(
+        'ERROR',
+        'BROWSER_LOST',
+        `The target at ${config.startUrl} could not be opened: ${message}`,
+      );
+      await session.close();
+      if (ownsDb) db.close();
+      return {
+        record,
+        evaluation: null,
+        // Evaluating a run that never started would be judging a blank page.
+        evaluationError: 'The run never reached the target, so there was nothing to evaluate.',
+        rejectedFindings: [],
+        sessionId,
+      };
+    }
+
     record = await runLoop({
       session,
       planner,
       recorder,
-      persona: config.persona,
+      context: config.context,
       goal: config.goal,
       secrets: deps.env.secrets,
       redact,

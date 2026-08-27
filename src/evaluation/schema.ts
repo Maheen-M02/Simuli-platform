@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CustomerVerdictSchema } from './verdict.ts';
 
 /**
  * What we report back about a run.
@@ -137,16 +138,33 @@ export const EvaluationSchema = z
     facts: DeterministicFactsSchema,
     /** Reclassifications the deterministic policy imposed on the model. */
     policyActions: z.array(PolicyActionSchema).max(25),
+    /**
+     * How the customer would feel. EXPERIMENTAL — see `verdict.ts`.
+     *
+     * Nullable because a run can fail before there is anything to feel about,
+     * and because a missing verdict must never be reported as a neutral one.
+     */
+    customerVerdict: CustomerVerdictSchema.nullable(),
   })
   .strict();
 
 export type Evaluation = z.infer<typeof EvaluationSchema>;
 
-/** The part the model is asked to produce; the facts and policy are ours. */
+/**
+ * The part the model is asked to produce; the facts and policy are ours.
+ *
+ * The verdict is optional here even though the assembled evaluation always
+ * carries the key. It is an experimental extra, and a model that omits it has
+ * still produced a usable evaluation — refusing the whole thing over a missing
+ * satisfaction score would throw away the findings, which are the part that
+ * matters.
+ */
 export const ModelEvaluationSchema = EvaluationSchema.pick({
   goalAchieved: true,
   summary: true,
   findings: true,
+}).extend({
+  customerVerdict: CustomerVerdictSchema.nullish().transform((value) => value ?? null),
 });
 
 export type ModelEvaluation = z.infer<typeof ModelEvaluationSchema>;

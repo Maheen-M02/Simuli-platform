@@ -55,6 +55,12 @@ export const FACT_KINDS = [
   'SCREENSHOT_CAPTURED',
   /** The run stopped, and why. */
   'RUN_TERMINATED',
+  /**
+   * The page was larger than our node budget, so the agent was shown only part
+   * of it. Ours, not the product's — and it looks exactly like a feature the
+   * product failed to surface, which is why it is named explicitly.
+   */
+  'OBSERVATION_TRUNCATED',
 ] as const;
 
 export type FactKind = (typeof FACT_KINDS)[number];
@@ -69,6 +75,7 @@ export const OUR_FAULT_FACT_KINDS: ReadonlySet<FactKind> = new Set<FactKind>([
   'RUNTIME_FAILURE',
   'PLANNER_FAILURE',
   'DESTRUCTIVE_ACTION_BLOCKED',
+  'OBSERVATION_TRUNCATED',
 ]);
 
 /** Error kinds that mean our machinery broke, not that the product misbehaved. */
@@ -132,6 +139,19 @@ function elementsIn(observationText: string): string[] {
   return elements;
 }
 
+/**
+ * How many elements we hid from the agent, if any.
+ *
+ * Read back out of the serialised observation rather than from a new column, so
+ * this needs no change to the stored schema. The serialiser already writes the
+ * count into the text it showed the model, which makes the text the honest
+ * record of what the agent could actually see.
+ */
+function truncatedCount(observationText: string): number {
+  const match = /\((\d+) further elements were omitted/.exec(observationText);
+  return match?.[1] === undefined ? 0 : Number(match[1]);
+}
+
 /** A structural signature, used only to say whether the page moved. */
 function pageSignature(step: StepRecord): string {
   return `${step.observation.url}\n${step.observation.text}`;
@@ -177,6 +197,17 @@ export function deriveEvidence(record: SessionRecord): EvidenceLedger {
         'PAGE_UNCHANGED',
         index,
         'The page was structurally identical to the previous step: same URL, same elements, same text.',
+      );
+    }
+
+    const hidden = truncatedCount(observation.text);
+    if (hidden > 0) {
+      add(
+        'OBSERVATION_TRUNCATED',
+        index,
+        `This page was too large for our snapshot budget, so ${hidden} element(s) were ` +
+          'never shown to the customer. Anything they failed to find on this page may ' +
+          'have been hidden by us rather than by the product.',
       );
     }
 

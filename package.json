@@ -18,7 +18,8 @@
     "agent": "tsx src/cli/main.ts",
     "eval:golden": "tsx scripts/evaluate-golden.ts",
     "eval:session": "tsx scripts/reevaluate.ts",
-    "check:endpoint": "tsx scripts/check-endpoint.ts"
+    "check:endpoint": "tsx scripts/check-endpoint.ts",
+    "validate:real": "tsx scripts/real-world-run.ts"
   },
   "dependencies": {
     "openai": "^6.9.0",

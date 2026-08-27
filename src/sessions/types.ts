@@ -1,6 +1,6 @@
 import type { Action } from '../actions/schema.ts';
 import type { Goal } from '../goals/schema.ts';
-import type { Persona } from '../personas/schema.ts';
+import type { CustomerContext } from '../personas/context.ts';
 import type { ActionResult } from '../types/shared.ts';
 
 /**
@@ -61,7 +61,8 @@ export type StepRecord = {
 export type SessionRecord = {
   readonly id: string;
   readonly startUrl: string;
-  readonly persona: Persona;
+  /** Who the customer was and what they came for. */
+  readonly context: CustomerContext;
   readonly goal: Goal;
   readonly startedAt: number;
   readonly endedAt: number | null;

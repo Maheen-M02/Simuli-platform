@@ -2,7 +2,7 @@ import { ActionSchema, type Action } from '../actions/schema.ts';
 import type { LlmClient } from '../llm/client.ts';
 import { ACTION_JSON_SCHEMA, buildSystemPrompt, buildUserPrompt } from './prompt.ts';
 import type { Goal } from '../goals/schema.ts';
-import type { Persona } from '../personas/schema.ts';
+import type { CustomerContext } from '../personas/context.ts';
 import type { Observation } from '../observations/types.ts';
 import { err, ok, type Result } from '../types/shared.ts';
 
@@ -33,7 +33,8 @@ export type HistoryEntry = {
 };
 
 export type PlannerInput = {
-  readonly persona: Persona;
+  /** Who the customer is, and what they came here for. */
+  readonly context: CustomerContext;
   readonly goal: Goal;
   readonly observation: Observation;
   readonly history: readonly HistoryEntry[];
@@ -79,6 +80,10 @@ export function createModelPlanner(options: {
         user,
         schemaName: 'customer_action',
         jsonSchema: ACTION_JSON_SCHEMA as unknown as Record<string, unknown>,
+        // One action plus its reasoning is a few hundred tokens. Asking for the
+        // client's larger default reserves budget we will never use, which a
+        // metered endpoint charges for and a prepaid one refuses outright.
+        maxOutputTokens: 1024,
       });
 
       if (!response.ok) return err(response.error);

@@ -6,6 +6,7 @@ import type { Planner, PlannerInput } from '../../src/agent/planner.ts';
 import { openDb, type Db } from '../../src/persistence/db.ts';
 import { createRecorder } from '../../src/sessions/recorder.ts';
 import { DEFAULT_PERSONA } from '../../src/personas/schema.ts';
+import { CustomerContextSchema } from '../../src/personas/context.ts';
 import { GoalSchema } from '../../src/goals/schema.ts';
 import { ActionSchema } from '../../src/actions/schema.ts';
 import { createRedactor } from '../../src/observations/redact.ts';
@@ -13,6 +14,10 @@ import { silentLogger } from '../../src/logging/logger.ts';
 import { ok, err, type Result } from '../../src/types/shared.ts';
 import type { Action } from '../../src/actions/schema.ts';
 import type { Limits } from '../../src/agent/termination.ts';
+
+/** Same persona as before, now inside the context envelope. */
+const CONTEXT = CustomerContextSchema.parse({ persona: DEFAULT_PERSONA });
+
 
 /**
  * The loop, end to end, with an injected fake planner.
@@ -72,7 +77,7 @@ async function drive(planner: Planner, startPath = '/', overrides: Partial<Limit
   const recorder = createRecorder({
     sessionId,
     startUrl: `${site.url}${startPath}`,
-    persona: DEFAULT_PERSONA,
+    context: CONTEXT,
     goal,
     plannerModel: 'scripted-fake',
     db,
@@ -82,7 +87,7 @@ async function drive(planner: Planner, startPath = '/', overrides: Partial<Limit
     session,
     planner,
     recorder,
-    persona: DEFAULT_PERSONA,
+    context: CONTEXT,
     goal,
     secrets: SECRETS,
     redact: createRedactor(SECRETS),

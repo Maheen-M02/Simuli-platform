@@ -1,5 +1,5 @@
 import { describeGoal } from '../goals/schema.ts';
-import { describePersona } from '../personas/schema.ts';
+import { describeCustomerContext } from '../personas/context.ts';
 import { PRESSABLE_KEYS, BLOCKER_KINDS } from '../actions/schema.ts';
 import type { PlannerInput } from './planner.ts';
 
@@ -39,7 +39,7 @@ const RULES = `How this works:
 
 export function buildSystemPrompt(input: PlannerInput): string {
   const sections = [
-    describePersona(input.persona),
+    describeCustomerContext(input.context),
     '',
     describeGoal(input.goal),
     '',
