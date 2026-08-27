@@ -198,6 +198,29 @@ describe('diversity measurement', () => {
   it('does not claim identical behaviour when runs differ', () => {
     expect(formatDiversity(measureDiversity(runs))).not.toContain('identical path');
   });
+
+  it('blames our own failure, not the persona, when every run errored', () => {
+    // Observed for real: credits ran out, every run ERRORed before acting, and
+    // the report said all personas behaved identically. True, and completely
+    // misleading — the paths were identical because nobody got to act.
+    const allFailed: RunPath[] = [
+      { personaId: 'a', path: ['/'], actions: [], outcome: 'ERROR', stepCount: 4 },
+      { personaId: 'b', path: ['/'], actions: [], outcome: 'ERROR', stepCount: 4 },
+    ];
+    const text = formatDiversity(measureDiversity(allFailed));
+    expect(text).toContain('none of them exercised the product');
+    expect(text).toContain('not persona behaviour');
+    expect(text).not.toContain('the persona made no');
+  });
+
+  it('warns when only some runs errored, since the counts include them', () => {
+    const mixed: RunPath[] = [
+      { personaId: 'a', path: ['/', '/app'], actions: ['click:e1'], outcome: 'SUCCESS', stepCount: 3 },
+      { personaId: 'b', path: ['/'], actions: [], outcome: 'ERROR', stepCount: 1 },
+    ];
+    const text = formatDiversity(measureDiversity(mixed));
+    expect(text).toContain('1 of 2 runs ended in ERROR');
+  });
 });
 
 describe('ground-truth scoring', () => {

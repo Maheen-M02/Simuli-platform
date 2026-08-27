@@ -160,7 +160,26 @@ export function formatDiversity(report: DiversityReport): string {
     lines.push(`    ${run.personaId.padEnd(24)} ${run.outcome.padEnd(8)} ${steps} steps`);
   }
 
-  if (report.uniquePathSequences === 1 && report.runs > 1) {
+  // A run that ended in ERROR never exercised the product, so its path says
+  // nothing about the persona. Reporting "every persona behaved identically"
+  // when in fact none of them got to act would be a conclusion about our own
+  // outage dressed up as a finding about customers.
+  const failed = report.outcomesByPersona.filter((run) => run.outcome === 'ERROR').length;
+
+  if (failed === report.runs && report.runs > 0) {
+    lines.push(
+      '',
+      `  NOTE: all ${report.runs} runs ended in ERROR, so none of them exercised the product.`,
+      '  These paths reflect a failure in our own tooling, not persona behaviour. Nothing',
+      '  about diversity can be concluded from this comparison.',
+    );
+  } else if (failed > 0) {
+    lines.push(
+      '',
+      `  NOTE: ${failed} of ${report.runs} runs ended in ERROR. Their paths reflect our own`,
+      '  failure rather than persona behaviour, and the counts above include them.',
+    );
+  } else if (report.uniquePathSequences === 1 && report.runs > 1) {
     // Stated loudly because it is the result that would undermine the premise.
     lines.push(
       '',
