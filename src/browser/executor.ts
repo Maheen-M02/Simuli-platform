@@ -220,6 +220,9 @@ export async function executeAction(
           return { ok: false, error: resolved.error, durationMs: elapsed(), navigated: false };
         }
 
+        const mismatch = checkElementType(action, resolved.value.node);
+        if (mismatch !== null) return { ...mismatch, durationMs: elapsed() };
+
         const blocked = checkDestructive(action, resolved.value.node, options.blockDestructive !== false);
         if (blocked !== null) return { ...blocked, durationMs: elapsed() };
 
@@ -238,6 +241,46 @@ export async function executeAction(
   } catch (caught) {
     return { ok: false, error: classify(caught), durationMs: elapsed(), navigated: false };
   }
+}
+
+/**
+ * Refuses an action that does not suit the element, and says what would.
+ *
+ * Playwright would otherwise spend the full timeout waiting for a `<select>` to
+ * become fillable and then report ELEMENT_NOT_ACTIONABLE — "it may be hidden,
+ * disabled or still loading". That message is not merely unhelpful, it is
+ * wrong, and it is read by two audiences that both act on it: the agent, which
+ * retries pointlessly, and the evaluator, which concluded from exactly this
+ * wording on a real run that the product's dropdown was broken. It was not.
+ *
+ * An executor that misdescribes a failure manufactures false findings about
+ * somebody's product, so the diagnosis belongs here, where the element is known.
+ */
+function checkElementType(action: Action, node: SnapshotNode): ActionResult | null {
+  const refuse = (message: string): ActionResult => ({
+    ok: false,
+    error: { kind: 'WRONG_ELEMENT_TYPE', message },
+    durationMs: 0,
+    navigated: false,
+  });
+
+  if (action.action === 'type' && node.role === 'combobox') {
+    const options = node.options === undefined ? '' : ` Its options are: ${node.options.join(', ')}.`;
+    return refuse(
+      `"${node.name}" is a dropdown, not a text field, so there is nothing to type into.` +
+        `${options} Use the select action to choose one of them.`,
+    );
+  }
+
+  if (action.action === 'select' && node.role !== 'combobox') {
+    return refuse(`"${node.name}" is not a dropdown, so there is nothing to select in it.`);
+  }
+
+  if (action.action === 'type' && node.role !== 'textbox' && node.role !== 'password') {
+    return refuse(`"${node.name}" is a ${node.role}, not a text field. You cannot type into it.`);
+  }
+
+  return null;
 }
 
 function checkDestructive(

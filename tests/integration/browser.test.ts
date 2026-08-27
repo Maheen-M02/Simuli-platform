@@ -354,6 +354,55 @@ describe('execution — refusals', () => {
   });
 });
 
+describe('wrong element type', () => {
+  it('tells the agent to use select on a dropdown, instead of timing out', async () => {
+    // From a real run: the agent typed into the team-size dropdown, Playwright
+    // spent its whole timeout and reported "may be hidden, disabled or still
+    // loading", and the evaluator concluded from that wording that the
+    // product's dropdown was broken. It was not — the action was just wrong.
+    await session.page.goto(`${site.url}/signup`);
+    await look();
+    await run({ action: 'type', ref: refFor('textbox', 'Work email'), value: 'combo@acme.test', ...common });
+    await run({ action: 'type', ref: refFor('password', 'Password'), value: { secret: 'PASSWORD' }, ...common });
+    await run({ action: 'click', ref: refFor('button', 'Create account'), ...common });
+    await look();
+    await run({ action: 'type', ref: refFor('textbox', 'Company name'), value: 'Combo Ltd', ...common });
+    await run({ action: 'click', ref: refFor('button', 'Continue'), ...common });
+    await look();
+
+    const started = Date.now();
+    const result = await run({ action: 'type', ref: refFor('combobox', 'Team size'), value: '2-10', ...common });
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('WRONG_ELEMENT_TYPE');
+    // The message must name the way forward, and list what can be chosen.
+    expect(result.error?.message).toContain('select action');
+    expect(result.error?.message).toContain('2-10');
+    // And it must not burn the full Playwright timeout getting there.
+    expect(Date.now() - started).toBeLessThan(2000);
+
+    // The element itself is fine: the correct action still works.
+    const selected = await run({ action: 'select', ref: refFor('combobox', 'Team size'), value: '2-10', ...common });
+    expect(selected.ok).toBe(true);
+  }, 60_000);
+
+  it('refuses select on something that is not a dropdown', async () => {
+    await session.page.goto(`${site.url}/signup`);
+    await look();
+    const result = await run({ action: 'select', ref: refFor('button', 'Create account'), value: 'x', ...common });
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('WRONG_ELEMENT_TYPE');
+  });
+
+  it('refuses typing into a button or a link', async () => {
+    await session.page.goto(`${site.url}/signup`);
+    await look();
+    const result = await run({ action: 'type', ref: refFor('link', 'Pricing'), value: 'x', ...common });
+    expect(result.ok).toBe(false);
+    expect(result.error?.kind).toBe('WRONG_ELEMENT_TYPE');
+  });
+});
+
 describe('destructive-name matching', () => {
   it('catches the phrasings a product actually uses', () => {
     for (const name of [
