@@ -239,7 +239,39 @@ export function extractSnapshot(nodeBudget: number): PageSnapshot {
       return;
     }
 
+    // Text sitting directly inside an element we do not otherwise report.
+    //
+    // Found by a real run against FreightFlow: its pricing page puts each price
+    // in a <div class="price"> and each plan name in a <strong>, so the agent
+    // was shown a pricing page with no prices and no plan names on it. It
+    // scrolled four times looking for them and gave up — correctly, given what
+    // we had shown it. Our previous fixture used <p> and tables throughout,
+    // which is why a whitelist of block tags looked sufficient for months.
+    //
+    // Only *direct* text children are taken, so each run of text is attributed
+    // to exactly one element and nothing is reported twice.
+    const own = directText(el);
+    if (own !== '') push({ role: 'text', name: own, ref: null, ...geometry(el) });
+
     for (const child of Array.from(el.children)) walk(child);
+  }
+
+  /**
+   * Concatenated text nodes that are immediate children of `el`.
+   *
+   * A `<label>` is excluded: its text is already the accessible name of the
+   * control it labels, so reporting it again would show the customer the same
+   * words twice and make a field indistinguishable from its own caption.
+   */
+  function directText(el: Element): string {
+    if (el.tagName.toLowerCase() === 'label') return '';
+
+    let text = '';
+    for (const node of Array.from(el.childNodes)) {
+      // 3 is Node.TEXT_NODE. The constant is not reliably available here.
+      if (node.nodeType === 3) text += node.textContent ?? '';
+    }
+    return clean(text);
   }
 
   function containsReportable(el: Element): boolean {

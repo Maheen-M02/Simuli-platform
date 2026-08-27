@@ -140,6 +140,54 @@ describe('observation', () => {
   });
 });
 
+describe('text in ordinary containers', () => {
+  it('reports text sitting directly in a div or a span', async () => {
+    // Found by a real run against a more realistic target: prices lived in
+    // <div class="price"> and plan names in <strong>, neither of which was in
+    // the block-tag whitelist, so the agent was shown a pricing page with no
+    // prices on it. It scrolled looking for them and gave up — correctly, given
+    // what we had shown it. Our fixture used <p> and tables throughout, which
+    // is why a whitelist looked sufficient.
+    await session.page.goto(`${site.url}/`);
+    await session.page.evaluate(() => {
+      const holder = document.createElement('div');
+      holder.innerHTML =
+        '<div id="probe"><div class="price">GBP 49<span>/mo</span></div>' +
+        '<strong>Starter plan</strong><em>limited time</em></div>';
+      document.body.appendChild(holder);
+    });
+
+    const observation = await look();
+    expect(observation.text).toContain('GBP 49');
+    expect(observation.text).toContain('Starter plan');
+    expect(observation.text).toContain('limited time');
+  });
+
+  it('attributes each run of text to one element, without duplicating it', async () => {
+    await session.page.goto(`${site.url}/`);
+    await session.page.evaluate(() => {
+      const holder = document.createElement('div');
+      holder.innerHTML = '<div>Outer text<span>inner text</span></div>';
+      document.body.appendChild(holder);
+    });
+
+    const observation = await look();
+    const outer = observation.text.split('\n').filter((line) => line.includes('Outer text'));
+    // Exactly one line, and it does not swallow the child's text.
+    expect(outer).toHaveLength(1);
+    expect(outer[0]).not.toContain('inner text');
+    expect(observation.text).toContain('inner text');
+  });
+
+  it('ignores whitespace-only text between elements', async () => {
+    await session.page.goto(`${site.url}/`);
+    const observation = await look();
+    for (const line of observation.text.split('\n')) {
+      expect(line).not.toMatch(/^text ""$/);
+    }
+  });
+});
+
 describe('code injected into the page', () => {
   it('survives a build that rewrites named functions', async () => {
     // Found by the first real CLI run, not by this suite: esbuild with
