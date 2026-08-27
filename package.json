@@ -2,7 +2,7 @@
   "name": "simuli-platform",
   "version": "0.0.0",
   "private": true,
-  "description": "AI customer simulation — run a realistic AI persona through a real product in a real browser.",
+  "description": "AI customer simulation \u00e2\u20ac\u201d run a realistic AI persona through a real product in a real browser.",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -15,7 +15,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "agent": "tsx src/cli/main.ts"
+    "agent": "tsx src/cli/main.ts",
+    "eval:golden": "tsx scripts/evaluate-golden.ts",
+    "eval:session": "tsx scripts/reevaluate.ts"
   },
   "dependencies": {
     "openai": "^6.9.0",

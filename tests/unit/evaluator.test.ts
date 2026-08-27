@@ -1,314 +1,309 @@
 import { describe, expect, it } from 'vitest';
-import {
-  evaluateSession,
-  renderTranscript,
-  validateStepRefs,
-} from '../../src/evaluation/evaluator.ts';
+import { evaluateSession, renderEvaluatorPrompt } from '../../src/evaluation/evaluator.ts';
 import { computeFacts } from '../../src/evaluation/deterministic.ts';
-import { FindingSchema, type Finding } from '../../src/evaluation/schema.ts';
-import { ActionSchema } from '../../src/actions/schema.ts';
-import { DEFAULT_PERSONA } from '../../src/personas/schema.ts';
-import { GoalSchema } from '../../src/goals/schema.ts';
-import type { SessionRecord, StepRecord } from '../../src/sessions/types.ts';
-import type { ActionResult, ErrorKind } from '../../src/types/shared.ts';
+import { deriveEvidence } from '../../src/evaluation/evidence.ts';
+import { EvaluationSchema, FindingSchema } from '../../src/evaluation/schema.ts';
+import { GOLDEN_SCENARIOS } from '../fixtures/golden/scenarios.ts';
 import type { LlmClient } from '../../src/llm/client.ts';
+import type { PolicyAction } from '../../src/evaluation/schema.ts';
 import { ok } from '../../src/types/shared.ts';
 
 /**
- * Evaluation is where a plausible paragraph can turn into a false claim about
- * somebody's product. Most of what follows tests refusal, not production.
+ * The evaluator end to end, with a fake client. No API call happens here.
+ *
+ * Each test pushes a specific kind of bad output through and checks that the
+ * deterministic layers catch it. That is the only way to make "our findings are
+ * trustworthy" a property of the code rather than a hope about the prompt.
  */
 
-const common = { reasoning: 'because', expectation: 'something happens' };
-
-function step(index: number, overrides: Partial<StepRecord> = {}): StepRecord {
-  return {
-    index,
-    observation: {
-      generation: index + 1,
-      capturedAt: 1000 + index,
-      url: `http://site.test/page-${index}`,
-      title: `Page ${index}`,
-      text: `heading1 "Page ${index}"`,
-      nodeCount: 3,
-      screenshotPath: null,
-    },
-    action: ActionSchema.parse({ action: 'click', ref: 'e1', ...common }),
-    result: { ok: true, durationMs: 10, navigated: true } satisfies ActionResult,
-    plannerError: null,
-    startedAt: 1000 + index,
-    endedAt: 1100 + index,
-    ...overrides,
-  };
+function record(id: string) {
+  const scenario = GOLDEN_SCENARIOS.find((s) => s.id === id);
+  if (scenario === undefined) throw new Error(`no golden scenario ${id}`);
+  return scenario.record;
 }
-
-function record(steps: StepRecord[], overrides: Partial<SessionRecord> = {}): SessionRecord {
-  return {
-    id: 'run-1',
-    startUrl: 'http://site.test/',
-    persona: DEFAULT_PERSONA,
-    goal: GoalSchema.parse({ description: 'Create an invoice' }),
-    plannerModel: 'test-model',
-    startedAt: 1000,
-    endedAt: 9000,
-    outcome: 'SUCCESS',
-    terminationReason: 'AGENT_FINISHED',
-    agentSummary: 'Invoice INV-0001 created',
-    steps,
-    ...overrides,
-  };
-}
-
-const finding = (stepRefs: number[]): Finding =>
-  FindingSchema.parse({
-    title: 'Password rules are hidden until you fail',
-    description: 'The customer only learned the rule after a rejected attempt.',
-    attribution: 'PRODUCT_FRICTION',
-    severity: 'medium',
-    stepRefs,
-  });
 
 function fakeClient(payload: unknown): LlmClient {
-  return { async completeJson() { return ok(payload); } };
+  return {
+    async completeJson() {
+      return ok(payload);
+    },
+  };
 }
 
-describe('deterministic pre-pass', () => {
-  it('counts what happened without any model involved', () => {
-    const failed: ActionResult = {
-      ok: false,
-      error: { kind: 'REF_NOT_FOUND', message: 'gone' },
-      durationMs: 5,
-      navigated: false,
-    };
+const baseFinding = {
+  finding: 'The product rejected a valid email address',
+  classification: 'PRODUCT_ISSUE',
+  severity: 'high',
+  evidence: 'The message stayed on screen after a valid address was entered.',
+  evidenceType: 'VALIDATION_MESSAGE',
+  confidence: 'high',
+  affectedPersona: 'Sam, a small business owner',
+  supportingSteps: [2],
+  evidenceRefs: [] as (string | undefined)[],
+  alternativeExplanation: 'The message may simply have persisted from an earlier submission.',
+  recommendation: 'Clear stale validation messages on re-render.',
+};
 
-    const facts = computeFacts(
-      record([step(0), step(1, { result: failed }), step(2, { action: null, plannerError: 'confused' })]),
-    );
+function payload(findings: unknown[]) {
+  return { goalAchieved: true, summary: 'A summary of the run.', findings };
+}
 
-    expect(facts.stepCount).toBe(3);
-    expect(facts.actionsAttempted).toBe(2);
-    expect(facts.actionsFailed).toBe(1);
-    expect(facts.plannerFailures).toBe(1);
-    expect(facts.errorsByKind['REF_NOT_FOUND']).toBe(1);
-    expect(facts.durationMs).toBe(8000);
+async function evaluate(scenarioId: string, findings: unknown[]) {
+  const actions: PolicyAction[] = [];
+  const result = await evaluateSession(record(scenarioId), {
+    client: fakeClient(payload(findings)),
+    model: 'test-model',
+    onPolicyActions: (a) => actions.push(...a),
+  });
+  return { result, actions };
+}
+
+describe('1. agent reasoning cannot be treated as evidence', () => {
+  it('never shows the model a belief inside the observed-facts section', () => {
+    const rec = record('persistent-validation-message');
+    const prompt = renderEvaluatorPrompt(rec, deriveEvidence(rec));
+
+    const factsSection = prompt.slice(prompt.indexOf('OBSERVED FACTS'), prompt.indexOf('AGENT BELIEFS'));
+    expect(factsSection).not.toContain('rejects example.com');
+    // It is present in the run, just quarantined below the fence.
+    expect(prompt).toContain('rejects example.com');
   });
 
-  it('notices backtracking', () => {
-    const revisit = step(2);
-    const facts = computeFacts(
-      record([
-        step(0),
-        step(1),
-        { ...revisit, observation: { ...revisit.observation, url: 'http://site.test/page-0' } },
-      ]),
-    );
-    expect(facts.distinctUrls).toBe(2);
-    expect(facts.revisitedUrls).toEqual(['http://site.test/page-0']);
+  it('demotes a product issue whose evidence type is the customer belief', async () => {
+    const { result, actions } = await evaluate('persistent-validation-message', [
+      { ...baseFinding, evidenceType: 'AGENT_BELIEF', evidenceRefs: ['f1'] },
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('INCONCLUSIVE');
+    expect(actions).toHaveLength(1);
   });
 
-  it('counts destructive refusals separately from ordinary failures', () => {
-    const blocked: ActionResult = {
-      ok: false,
-      error: { kind: 'ACTION_BLOCKED', message: 'would send a real invoice' },
-      durationMs: 1,
-      navigated: false,
-    };
-    const facts = computeFacts(record([step(0, { result: blocked })]));
-    expect(facts.destructiveActionsBlocked).toBe(1);
-    // Refusing to press "Send" is our policy working, not our tooling breaking.
-    expect(facts.runIsTechnicallySound).toBe(true);
+  it('rejects a belief id offered as an evidence ref', () => {
+    // The schema will not even accept a `b`-prefixed id in evidenceRefs.
+    expect(FindingSchema.safeParse({ ...baseFinding, evidenceRefs: ['b2'] }).success).toBe(false);
+    expect(FindingSchema.safeParse({ ...baseFinding, evidenceRefs: ['f2'] }).success).toBe(true);
+  });
+});
+
+describe('2. unsupported product findings become INCONCLUSIVE', () => {
+  it('demotes a product issue that cites no facts', async () => {
+    const { result } = await evaluate('thin-evidence-giveup', [{ ...baseFinding, supportingSteps: [0] }]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('INCONCLUSIVE');
   });
 
-  it('marks a run unsound when our own machinery failed', () => {
-    for (const kind of ['BROWSER_CRASHED', 'UNKNOWN', 'STALE_SNAPSHOT', 'SECRET_NOT_FOUND'] as ErrorKind[]) {
-      const facts = computeFacts(
-        record([
-          step(0, {
-            result: { ok: false, error: { kind, message: 'x' }, durationMs: 1, navigated: false },
-          }),
-        ]),
-      );
-      expect(facts.runIsTechnicallySound, kind).toBe(false);
+  it('records the demotion rather than applying it silently', async () => {
+    const { result } = await evaluate('thin-evidence-giveup', [{ ...baseFinding, supportingSteps: [0] }]);
+    if (!result.ok) return;
+    expect(result.value.policyActions).toHaveLength(1);
+    expect(result.value.policyActions[0]?.from).toBe('PRODUCT_ISSUE');
+    expect(result.value.policyActions[0]?.to).toBe('INCONCLUSIVE');
+  });
+});
+
+describe('3. observable browser evidence can support a product finding', () => {
+  it('keeps a product finding built on a validation message the product showed', async () => {
+    const rec = record('hidden-password-rule');
+    const ledger = deriveEvidence(rec);
+    const message = ledger.facts.find((f) => f.kind === 'VALIDATION_MESSAGE_SHOWN');
+    expect(message).toBeDefined();
+
+    const { result, actions } = await evaluate('hidden-password-rule', [
+      {
+        ...baseFinding,
+        finding: 'The password rule is only revealed after a failed attempt',
+        evidenceRefs: [message?.id],
+        supportingSteps: [2],
+      },
+    ]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('PRODUCT_ISSUE');
+    expect(result.value.findings[0]?.confidence).toBe('high');
+    expect(actions).toHaveLength(0);
+  });
+
+  it('keeps a product finding built on what was present on the page', async () => {
+    const rec = record('ambiguous-duplicate-labels');
+    const ledger = deriveEvidence(rec);
+    const present = ledger.facts.find((f) => f.kind === 'ELEMENT_PRESENT');
+
+    const { result } = await evaluate('ambiguous-duplicate-labels', [
+      {
+        ...baseFinding,
+        finding: 'Two different controls share the label "Continue"',
+        evidenceType: 'PAGE_CONTENT',
+        evidenceRefs: [present?.id],
+        supportingSteps: [0],
+      },
+    ]);
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('PRODUCT_ISSUE');
+  });
+});
+
+describe('4. agent misunderstanding is classified separately', () => {
+  it('preserves an AGENT_MISUNDERSTANDING classification untouched', async () => {
+    const rec = record('typed-into-dropdown');
+    const ledger = deriveEvidence(rec);
+    const present = ledger.facts.find((f) => f.kind === 'ELEMENT_PRESENT');
+
+    const { result, actions } = await evaluate('typed-into-dropdown', [
+      {
+        ...baseFinding,
+        finding: 'The customer typed into a dropdown instead of selecting from it',
+        classification: 'AGENT_MISUNDERSTANDING',
+        evidenceType: 'ACTION_RESULT',
+        evidenceRefs: [present?.id],
+        supportingSteps: [0],
+      },
+    ]);
+
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('AGENT_MISUNDERSTANDING');
+    expect(actions).toHaveLength(0);
+  });
+
+  it('does not let an agent misunderstanding be counted as a product issue', async () => {
+    const { result } = await evaluate('typed-into-dropdown', [
+      { ...baseFinding, classification: 'AGENT_MISUNDERSTANDING', evidenceRefs: ['f1'] },
+    ]);
+    if (!result.ok) return;
+    const products = result.value.findings.filter((f) => f.classification === 'PRODUCT_ISSUE');
+    expect(products).toHaveLength(0);
+  });
+});
+
+describe('5. environment and browser failures are classified separately', () => {
+  it('reclassifies a product issue resting only on a browser crash', async () => {
+    const rec = record('browser-crashed');
+    const runtime = deriveEvidence(rec)
+      .facts.filter((f) => f.kind === 'RUNTIME_FAILURE')
+      .map((f) => f.id);
+
+    const { result, actions } = await evaluate('browser-crashed', [
+      { ...baseFinding, evidenceRefs: runtime, evidenceType: 'RUNTIME_FAILURE', supportingSteps: [0] },
+    ]);
+
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('ENVIRONMENT_ERROR');
+    expect(actions[0]?.reason).toContain('our own simulation');
+  });
+
+  it('reclassifies a product issue resting only on our destructive-action block', async () => {
+    const rec = record('destructive-block');
+    const blocked = deriveEvidence(rec)
+      .facts.filter((f) => f.kind === 'DESTRUCTIVE_ACTION_BLOCKED')
+      .map((f) => f.id);
+
+    const { result } = await evaluate('destructive-block', [
+      { ...baseFinding, evidenceRefs: blocked, supportingSteps: [0] },
+    ]);
+    if (!result.ok) return;
+    expect(result.value.findings[0]?.classification).toBe('ENVIRONMENT_ERROR');
+  });
+});
+
+describe('6. findings contain explicit evidence', () => {
+  it('requires every evidence field, refusing a finding that omits one', () => {
+    for (const field of [
+      'finding',
+      'classification',
+      'severity',
+      'evidence',
+      'evidenceType',
+      'confidence',
+      'affectedPersona',
+      'supportingSteps',
+      'alternativeExplanation',
+      'recommendation',
+    ]) {
+      const incomplete: Record<string, unknown> = { ...baseFinding };
+      delete incomplete[field];
+      expect(FindingSchema.safeParse(incomplete).success, `missing ${field}`).toBe(false);
     }
   });
 
-  it('marks a run unsound when it ended in ERROR', () => {
-    const facts = computeFacts(record([step(0)], { outcome: 'ERROR', terminationReason: 'BROWSER_LOST' }));
-    expect(facts.runIsTechnicallySound).toBe(false);
+  it('refuses an empty alternative explanation', () => {
+    // A finding that has not considered the other reading has not been thought
+    // about, and this is where most false positives would otherwise get through.
+    expect(FindingSchema.safeParse({ ...baseFinding, alternativeExplanation: '' }).success).toBe(false);
   });
 
-  it('does not blame the product for a technically broken run', () => {
-    const facts = computeFacts(record([step(0)], { outcome: 'ERROR' }));
-    expect(facts.runIsTechnicallySound).toBe(false);
-  });
-});
-
-describe('step-reference validation', () => {
-  it('keeps a finding that cites real steps', () => {
-    const { kept, rejected } = validateStepRefs([finding([0, 1])], 3);
-    expect(kept).toHaveLength(1);
-    expect(rejected).toHaveLength(0);
-  });
-
-  it('drops a finding whose evidence never happened', () => {
-    const { kept, rejected } = validateStepRefs([finding([14])], 9);
-    expect(kept).toHaveLength(0);
-    expect(rejected).toHaveLength(1);
-  });
-
-  it('strips phantom references but keeps a finding with real evidence left', () => {
-    const { kept } = validateStepRefs([finding([1, 99])], 5);
-    expect(kept[0]?.stepRefs).toEqual([1]);
-  });
-
-  it('rejects an out-of-range reference and keeps the last real one', () => {
-    expect(validateStepRefs([finding([5])], 5).kept).toHaveLength(0);
-    expect(validateStepRefs([finding([4])], 5).kept).toHaveLength(1);
-  });
-
-  it('never accepts a negative reference in the first place', () => {
-    // The schema stops this before validateStepRefs is reached; the range check
-    // there is the second line, for a finding built some other way.
-    expect(FindingSchema.safeParse({ ...finding([0]), stepRefs: [-1] }).success).toBe(false);
-    expect(validateStepRefs([{ ...finding([0]), stepRefs: [-1] }], 5).kept).toHaveLength(0);
-  });
-
-  it('handles a record with no steps at all', () => {
-    expect(validateStepRefs([finding([0])], 0).kept).toHaveLength(0);
+  it('refuses a finding citing no step at all', () => {
+    expect(FindingSchema.safeParse({ ...baseFinding, supportingSteps: [] }).success).toBe(false);
   });
 });
 
-describe('evaluation output', () => {
-  const validPayload = {
-    goalAchieved: true,
-    summary: 'The customer created an invoice, but had to guess where invoices lived.',
-    findings: [
-      {
-        title: 'Invoices are hidden behind "Billing"',
-        description: 'The customer looked for "Invoices" and found nothing by that name.',
-        attribution: 'PRODUCT_FRICTION',
-        severity: 'medium',
-        stepRefs: [1],
-      },
-    ],
-  };
+describe('7. evaluator output conforms to the Zod schema', () => {
+  it('produces a schema-valid evaluation carrying our own computed facts', async () => {
+    const rec = record('hidden-nav-label');
+    const ledger = deriveEvidence(rec);
+    const fact = ledger.facts[0];
 
-  it('produces a validated evaluation carrying our own facts', async () => {
-    const result = await evaluateSession(record([step(0), step(1)]), {
-      client: fakeClient(validPayload),
+    const result = await evaluateSession(rec, {
+      client: fakeClient(payload([{ ...baseFinding, evidenceRefs: [fact?.id], supportingSteps: [0] }])),
       model: 'test-model',
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.sessionId).toBe('run-1');
-    expect(result.value.findings).toHaveLength(1);
-    // The facts are computed by us, not supplied by the model.
-    expect(result.value.facts.stepCount).toBe(2);
+    expect(EvaluationSchema.safeParse(result.value).success).toBe(true);
+    // The measurements are ours, not the model's.
+    expect(result.value.facts).toEqual(computeFacts(rec));
+    expect(result.value.sessionId).toBe(rec.id);
   });
 
-  it('discards a hallucinated finding and reports that it did so', async () => {
-    const rejected: Finding[] = [];
-    const result = await evaluateSession(record([step(0)]), {
-      client: fakeClient({
-        ...validPayload,
-        findings: [
-          { ...validPayload.findings[0], stepRefs: [0] },
-          { ...validPayload.findings[0], title: 'Invented', stepRefs: [12, 13] },
-        ],
-      }),
-      model: 'test-model',
-      onRejectedFindings: (findings) => rejected.push(...findings),
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.value.findings).toHaveLength(1);
-    expect(result.value.findings[0]?.title).not.toBe('Invented');
-    expect(rejected).toHaveLength(1);
-  });
-
-  it('rejects an evaluation with an attribution outside the allowed set', async () => {
-    const result = await evaluateSession(record([step(0)]), {
-      client: fakeClient({
-        ...validPayload,
-        findings: [{ ...validPayload.findings[0], attribution: 'CUSTOMER_FAULT' }],
-      }),
-      model: 'test-model',
-    });
-
+  it('rejects a classification outside the allowed set', async () => {
+    const { result } = await evaluate('clean-success', [
+      { ...baseFinding, classification: 'CUSTOMER_FAULT' },
+    ]);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain('did not validate');
   });
 
-  it('rejects a finding with no evidence cited at all', async () => {
-    const result = await evaluateSession(record([step(0)]), {
-      client: fakeClient({
-        ...validPayload,
-        findings: [{ ...validPayload.findings[0], stepRefs: [] }],
-      }),
-      model: 'test-model',
-    });
+  it('rejects an evidence type outside the allowed set', async () => {
+    const { result } = await evaluate('clean-success', [{ ...baseFinding, evidenceType: 'VIBES' }]);
     expect(result.ok).toBe(false);
   });
 
   it('rejects malformed model output rather than salvaging it', async () => {
-    for (const payload of [null, 'looks fine to me', { summary: 'no verdict' }, { goalAchieved: 'yes' }]) {
-      const result = await evaluateSession(record([step(0)]), {
-        client: fakeClient(payload),
+    for (const bad of [null, 'looks fine', { summary: 'no verdict' }, { goalAchieved: 'yes' }]) {
+      const result = await evaluateSession(record('clean-success'), {
+        client: fakeClient(bad),
         model: 'test-model',
       });
-      expect(result.ok, JSON.stringify(payload)).toBe(false);
+      expect(result.ok, JSON.stringify(bad)).toBe(false);
     }
   });
 
-  it('accepts a clean run with no findings', async () => {
-    const result = await evaluateSession(record([step(0)]), {
-      client: fakeClient({ goalAchieved: true, summary: 'Nothing got in the way.', findings: [] }),
-      model: 'test-model',
-    });
+  it('accepts a clean run reported with no findings at all', async () => {
+    const { result } = await evaluate('clean-success', []);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.findings).toEqual([]);
+    if (result.ok) {
+      expect(result.value.findings).toEqual([]);
+      expect(result.value.policyActions).toEqual([]);
+    }
   });
 });
 
-describe('transcript rendering', () => {
-  it('gives the evaluator step numbers it can cite, and both sides of the gap', () => {
-    const transcript = renderTranscript(record([step(0), step(1)]));
-    expect(transcript).toContain('--- Step 0 ---');
-    expect(transcript).toContain('--- Step 1 ---');
-    expect(transcript).toContain('Expected to happen: something happens');
-    // The customer's reasoning must be presented as a belief. Unlabelled, the
-    // evaluator read two such guesses as product behaviour on a real run and
-    // filed findings that were simply false.
-    expect(transcript).toContain('Believed at the time (may be mistaken): because');
+describe('the prompt tells the model the rules it will be held to', () => {
+  it('shows computed measurements separately from the evidence ledger', () => {
+    const rec = record('broken-submit');
+    const prompt = renderEvaluatorPrompt(rec, deriveEvidence(rec));
+    expect(prompt).toContain('COMPUTED MEASUREMENTS');
+    expect(prompt).toContain('OBSERVED FACTS');
+    expect(prompt.indexOf('COMPUTED MEASUREMENTS')).toBeLessThan(prompt.indexOf('OBSERVED FACTS'));
   });
 
-  it('shows failures with their kind', () => {
-    const transcript = renderTranscript(
-      record([
-        step(0, {
-          result: {
-            ok: false,
-            error: { kind: 'ACTION_BLOCKED', message: 'would send a real invoice' },
-            durationMs: 1,
-            navigated: false,
-          },
-        }),
-      ]),
-    );
-    expect(transcript).toContain('FAILED — ACTION_BLOCKED');
-  });
-
-  it('never leaks a secret value into the transcript', () => {
-    const typed = ActionSchema.parse({
-      action: 'type',
-      ref: 'e2',
-      value: { secret: 'PASSWORD' },
-      ...common,
-    });
-    const transcript = renderTranscript(record([step(0, { action: typed })]));
-    expect(transcript).toContain('<secret:PASSWORD>');
-    expect(transcript).not.toContain('correct-horse');
+  it('never leaks a secret value into the prompt', () => {
+    const rec = record('missing-credential');
+    const prompt = renderEvaluatorPrompt(rec, deriveEvidence(rec));
+    expect(prompt).toContain('secret:PASSWORD');
+    expect(prompt).not.toContain('correct-horse');
   });
 });

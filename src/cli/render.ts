@@ -38,10 +38,11 @@ const OUTCOME_COLOR: Record<string, string> = {
   ERROR: RED,
 };
 
-const ATTRIBUTION_LABEL: Record<Finding['attribution'], string> = {
-  PRODUCT_FRICTION: 'product',
-  AGENT_LIMITATION: 'our agent',
-  TECHNICAL_FAILURE: 'our tooling',
+const CLASSIFICATION_LABEL: Record<Finding['classification'], string> = {
+  PRODUCT_ISSUE: 'product',
+  AGENT_MISUNDERSTANDING: 'our agent',
+  ENVIRONMENT_ERROR: 'our tooling',
+  INCONCLUSIVE: 'inconclusive',
 };
 
 export function renderProgress(stepIndex: number, record: string): string {
@@ -113,24 +114,53 @@ export function renderEvaluation(evaluation: Evaluation): string {
   );
 
   for (const finding of sorted) {
-    const severity = finding.severity === 'high' ? paint(RED, 'high') : finding.severity === 'medium' ? paint(YELLOW, 'medium') : paint(DIM, 'low');
-    // Attribution is never hidden: a finding that is our fault says so here.
-    const attribution = paint(
-      finding.attribution === 'PRODUCT_FRICTION' ? BLUE : DIM,
-      ATTRIBUTION_LABEL[finding.attribution],
-    );
+    const severity =
+      finding.severity === 'high'
+        ? paint(RED, 'high')
+        : finding.severity === 'medium'
+          ? paint(YELLOW, 'medium')
+          : paint(DIM, 'low');
 
-    lines.push(`  ${paint(BOLD, finding.title)}  ${severity} · ${attribution}`);
-    lines.push(`    ${finding.description}`);
-    lines.push(`    ${paint(DIM, `steps ${finding.stepRefs.join(', ')}`)}`);
+    // Classification is never hidden: a finding that is our fault says so, and
+    // one we could not settle says that rather than implying a product defect.
+    const label = CLASSIFICATION_LABEL[finding.classification];
+    const classification = paint(finding.classification === 'PRODUCT_ISSUE' ? BLUE : DIM, label);
+
+    lines.push(`  ${paint(BOLD, finding.finding)}  ${severity} · ${classification} · ${paint(DIM, `${finding.confidence} confidence`)}`);
+    lines.push(`    ${paint(DIM, 'Evidence:')} ${finding.evidence}`);
+    lines.push(`    ${paint(DIM, 'Or perhaps:')} ${finding.alternativeExplanation}`);
+    lines.push(`    ${paint(DIM, 'Suggested:')} ${finding.recommendation}`);
+    lines.push(
+      `    ${paint(DIM, `steps ${finding.supportingSteps.join(', ')} · ${finding.evidenceType} · affects ${finding.affectedPersona}`)}`,
+    );
     lines.push('');
   }
 
-  const byProduct = evaluation.findings.filter((f) => f.attribution === 'PRODUCT_FRICTION').length;
-  const byUs = evaluation.findings.length - byProduct;
+  const counts = new Map<Finding['classification'], number>();
+  for (const finding of evaluation.findings) {
+    counts.set(finding.classification, (counts.get(finding.classification) ?? 0) + 1);
+  }
   lines.push(
-    paint(DIM, `  ${byProduct} about the product, ${byUs} about our own simulation.`),
+    paint(
+      DIM,
+      '  ' +
+        [...counts.entries()]
+          .map(([classification, n]) => `${n} ${CLASSIFICATION_LABEL[classification]}`)
+          .join(', '),
+    ),
   );
+
+  // Overriding the model is a signal about our own reliability, so it is shown
+  // rather than quietly applied.
+  if (evaluation.policyActions.length > 0) {
+    lines.push(
+      '',
+      paint(YELLOW, `  ${evaluation.policyActions.length} finding(s) were reclassified because the evidence did not support them:`),
+    );
+    for (const action of evaluation.policyActions) {
+      lines.push(paint(DIM, `    ${action.from} -> ${action.to}: ${action.reason}`));
+    }
+  }
 
   return lines.join('\n');
 }

@@ -124,7 +124,7 @@ export async function runSimulation(
       onRejectedFindings: (findings) => {
         rejectedFindings.push(...findings);
         logger.warn(
-          { count: findings.length, titles: findings.map((f) => f.title) },
+          { count: findings.length, titles: findings.map((f) => f.finding) },
           'discarded findings that cited steps which never happened',
         );
       },

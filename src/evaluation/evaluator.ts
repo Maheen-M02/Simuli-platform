@@ -1,15 +1,19 @@
-import { describeAction } from '../actions/schema.ts';
 import type { LlmClient } from '../llm/client.ts';
 import type { SessionRecord } from '../sessions/types.ts';
 import { err, ok, type Result } from '../types/shared.ts';
 import { computeFacts, describeFacts } from './deterministic.ts';
+import { deriveEvidence, renderEvidence, type EvidenceLedger } from './evidence.ts';
+import { applyEvidencePolicy } from './policy.ts';
 import {
-  ATTRIBUTIONS,
+  CLASSIFICATIONS,
+  CONFIDENCES,
+  EVIDENCE_TYPES,
   EvaluationSchema,
   ModelEvaluationSchema,
   SEVERITIES,
   type Evaluation,
   type Finding,
+  type PolicyAction,
 } from './schema.ts';
 
 /**
@@ -20,10 +24,15 @@ import {
  * evaluator over sessions recorded months ago and compare results — evaluation
  * quality and agent quality improve independently.
  *
- * Findings that cite steps which did not happen are discarded, not corrected.
- * A confident paragraph about step 14 of a nine-step run is exactly the failure
- * mode that would destroy trust in the whole product, and the cheapest place to
- * stop it is here.
+ * Three layers, weakest last:
+ *  1. `deriveEvidence` builds a fact ledger from the record, by code.
+ *  2. The model may only cite from that ledger, and must answer a fixed set of
+ *     questions about each finding, including what else could explain it.
+ *  3. `applyEvidencePolicy` checks the result mechanically and demotes what the
+ *     evidence does not support.
+ *
+ * Only the middle layer involves judgment, and it is the only one that can be
+ * wrong in a way the other two cannot catch.
  */
 
 const EVALUATION_JSON_SCHEMA = {
@@ -31,7 +40,7 @@ const EVALUATION_JSON_SCHEMA = {
   properties: {
     goalAchieved: {
       type: 'boolean',
-      description: 'Did the customer actually accomplish the goal? Judge from the record.',
+      description: 'Did the customer actually accomplish the goal? Judge from the observed facts.',
     },
     summary: {
       type: 'string',
@@ -42,17 +51,41 @@ const EVALUATION_JSON_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
-          attribution: { enum: [...ATTRIBUTIONS] },
+          finding: { type: 'string', description: 'One sentence naming the problem.' },
+          classification: { enum: [...CLASSIFICATIONS] },
           severity: { enum: [...SEVERITIES] },
-          stepRefs: {
-            type: 'array',
-            items: { type: 'integer' },
-            description: 'Step numbers (as shown) that this finding rests on.',
+          evidence: {
+            type: 'string',
+            description: 'Quote or closely paraphrase the observed facts you are citing.',
           },
+          evidenceType: { enum: [...EVIDENCE_TYPES] },
+          confidence: { enum: [...CONFIDENCES] },
+          affectedPersona: { type: 'string' },
+          supportingSteps: { type: 'array', items: { type: 'integer' } },
+          evidenceRefs: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Fact ids such as "f12", from OBSERVED FACTS only. Never a belief id.',
+          },
+          alternativeExplanation: {
+            type: 'string',
+            description: 'The most plausible reading under which this is not a product problem.',
+          },
+          recommendation: { type: 'string' },
         },
-        required: ['title', 'description', 'attribution', 'severity', 'stepRefs'],
+        required: [
+          'finding',
+          'classification',
+          'severity',
+          'evidence',
+          'evidenceType',
+          'confidence',
+          'affectedPersona',
+          'supportingSteps',
+          'evidenceRefs',
+          'alternativeExplanation',
+          'recommendation',
+        ],
         additionalProperties: false,
       },
     },
@@ -63,109 +96,64 @@ const EVALUATION_JSON_SCHEMA = {
 
 const SYSTEM_PROMPT = `You review recordings of a simulated customer using a product.
 
-Your job is to say what that customer actually experienced, and to be strict
-about whose problem each thing was.
+You are given two things, and the difference between them is the whole job:
 
-Every finding must be attributed:
-- PRODUCT_FRICTION: the product made this hard. Unclear labels, hidden rules,
-  dead ends, work the customer should not have had to do.
-- AGENT_LIMITATION: the simulated customer was not good enough. It missed
-  something a real person would have seen, or gave up too early.
-- TECHNICAL_FAILURE: the simulation itself broke.
+OBSERVED FACTS — derived mechanically from the recording. Each has an id like
+f7. These are the only things you may cite as evidence.
 
-Be honest about the second and third. Findings that blame the product for our
-own shortcomings are worse than no findings at all.
+AGENT BELIEFS — what the simulated customer thought was happening. Ids like b3.
+These are guesses, often wrong. They are NOT evidence. You may mention that the
+customer believed something, but a belief can never support a claim about the
+product. Never put a belief id in evidenceRefs.
+
+Classify every finding as exactly one of:
+
+- PRODUCT_ISSUE: the product made this hard, or it broke. Requires observed
+  facts that show the product behaving that way.
+- AGENT_MISUNDERSTANDING: the simulated customer got something wrong — used a
+  control incorrectly, misread a message, gave up while a path was open, or drew
+  a conclusion the facts do not support. Our shortcoming, not the product's.
+- ENVIRONMENT_ERROR: our simulation or the browser failed. Facts labelled
+  RUNTIME_FAILURE, PLANNER_FAILURE or DESTRUCTIVE_ACTION_BLOCKED are ours, never
+  the product's.
+- INCONCLUSIVE: something notable happened but the evidence will not settle
+  whose problem it is.
+
+Prefer INCONCLUSIVE over a PRODUCT_ISSUE you cannot evidence. An honest "we
+cannot tell from this run" is worth more than a confident guess, because every
+false product finding costs us the customer's trust in all the true ones.
 
 Rules:
-- Every finding must cite the step numbers it rests on. Only cite steps that
-  appear in the record below.
-- Do not invent detail. If the record does not show something, it did not happen.
-- The computed facts given to you are measurements, not opinions. Do not
-  contradict them.
-- A run where nothing went wrong should produce few findings or none. Do not
-  manufacture problems to fill space.
-- Judge goalAchieved from the evidence, not from what the customer claimed.
-- What the customer believed and expected is a guess they made at the time, not
-  a fact about the product. They routinely misdiagnose why something happened.
-  Evidence is what the page actually showed. Never turn a customer's stated
-  theory into a product finding unless the pages themselves bear it out.
-- A message on the page persists until the page is re-rendered. A customer
-  seeing the same error after fixing the input has usually not triggered a new
-  error; they are looking at the old one. Do not report that as the product
-  rejecting valid input.`;
+- Every finding needs evidenceRefs pointing at real fact ids, and
+  supportingSteps that appear in the recording.
+- A fact marked MESSAGE_PERSISTED_UNCHANGED means a message stayed on screen
+  because the page had not re-rendered. It is NOT the product rejecting input
+  again. Do not report a persisting message as repeated rejection.
+- Do not contradict the computed facts. They are measurements.
+- alternativeExplanation must be a real attempt at the other reading, not a
+  dismissal. If the alternative is as plausible as your finding, the
+  classification is INCONCLUSIVE.
+- A run where nothing went wrong should produce no findings. Do not manufacture
+  problems to fill space.
+- Judge goalAchieved from the facts, not from what the customer claimed.`;
 
-/** The record, rendered for the model. Step numbers here are what may be cited. */
-export function renderTranscript(record: SessionRecord): string {
-  const lines: string[] = [
-    `Goal: ${record.goal.description}`,
-    `Customer: ${record.persona.name} — ${record.persona.background}`,
-    `Outcome recorded by the system: ${record.outcome ?? 'unknown'} (${record.terminationReason ?? 'unknown'})`,
+/** Renders the record for the model: computed facts, then the evidence ledger. */
+export function renderEvaluatorPrompt(record: SessionRecord, ledger: EvidenceLedger): string {
+  const facts = computeFacts(record);
+
+  return [
+    `Goal the customer was given: ${record.goal.description}`,
+    `Who they were: ${record.persona.name} — ${record.persona.background}`,
+    `How the run ended: ${record.outcome ?? 'unknown'} (${record.terminationReason ?? 'unknown'})`,
+    record.agentSummary === null ? '' : `What the customer said at the end: ${record.agentSummary}`,
     '',
-  ];
-
-  for (const step of record.steps) {
-    lines.push(`--- Step ${step.index} ---`);
-    lines.push(`Page: ${step.observation.title} (${step.observation.url})`);
-    lines.push(step.observation.text);
-
-    if (step.plannerError !== null) {
-      lines.push(`The customer could not decide what to do: ${step.plannerError}`);
-    }
-
-    if (step.action !== null) {
-      lines.push(`Did: ${describeAction(step.action)}`);
-      // Labelled as belief, not fact. On a real run the evaluator read two of
-      // these as product behaviour and filed false findings: the customer had
-      // guessed at why a stale error message was still on screen, and was wrong
-      // both times.
-      lines.push(`Believed at the time (may be mistaken): ${step.action.reasoning}`);
-      lines.push(`Expected to happen: ${step.action.expectation}`);
-
-      const result = step.result;
-      if (result !== null) {
-        lines.push(
-          result.ok
-            ? `Result: the action went through${result.navigated ? ' and the page changed' : ''}.`
-            : `Result: FAILED — ${result.error?.kind}: ${result.error?.message}`,
-        );
-      }
-    }
-
-    lines.push('');
-  }
-
-  if (record.agentSummary !== null) {
-    lines.push(`The customer's closing statement: ${record.agentSummary}`);
-  }
-
-  return lines.join('\n');
-}
-
-/**
- * Drops findings that cite steps which do not exist.
- *
- * A finding is kept when at least one cited step is real, with the phantom
- * references stripped; it is dropped when none of them are. Partial citation
- * errors are common and usually harmless, but a finding with no real evidence
- * behind it is a hallucination and must not reach a customer.
- */
-export function validateStepRefs(
-  findings: readonly Finding[],
-  stepCount: number,
-): { readonly kept: Finding[]; readonly rejected: Finding[] } {
-  const kept: Finding[] = [];
-  const rejected: Finding[] = [];
-
-  for (const finding of findings) {
-    const real = finding.stepRefs.filter((ref) => ref >= 0 && ref < stepCount);
-    if (real.length === 0) {
-      rejected.push(finding);
-      continue;
-    }
-    kept.push(real.length === finding.stepRefs.length ? finding : { ...finding, stepRefs: real });
-  }
-
-  return { kept, rejected };
+    'COMPUTED MEASUREMENTS (not opinions):',
+    describeFacts(facts),
+    '',
+    renderEvidence(ledger),
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
 }
 
 export type EvaluateOptions = {
@@ -173,6 +161,8 @@ export type EvaluateOptions = {
   readonly model: string;
   /** Called with findings dropped for citing steps that never happened. */
   readonly onRejectedFindings?: (rejected: readonly Finding[]) => void;
+  /** Called with reclassifications the policy imposed on the model. */
+  readonly onPolicyActions?: (actions: readonly PolicyAction[]) => void;
 };
 
 export async function evaluateSession(
@@ -180,20 +170,12 @@ export async function evaluateSession(
   options: EvaluateOptions,
 ): Promise<Result<Evaluation, string>> {
   const facts = computeFacts(record);
-
-  const user = [
-    'Computed facts about this run (measurements, not opinions):',
-    describeFacts(facts),
-    '',
-    'The recording:',
-    '',
-    renderTranscript(record),
-  ].join('\n');
+  const ledger = deriveEvidence(record);
 
   const response = await options.client.completeJson({
     model: options.model,
     system: SYSTEM_PROMPT,
-    user,
+    user: renderEvaluatorPrompt(record, ledger),
     schemaName: 'session_evaluation',
     jsonSchema: EVALUATION_JSON_SCHEMA as unknown as Record<string, unknown>,
     // Judgment should be stable: the same record twice should read the same way.
@@ -210,15 +192,17 @@ export async function evaluateSession(
     return err(`The evaluation did not validate: ${issues}`);
   }
 
-  const { kept, rejected } = validateStepRefs(parsed.data.findings, record.steps.length);
-  if (rejected.length > 0) options.onRejectedFindings?.(rejected);
+  const policy = applyEvidencePolicy(parsed.data.findings, ledger, record.steps.length);
+  if (policy.rejected.length > 0) options.onRejectedFindings?.(policy.rejected);
+  if (policy.actions.length > 0) options.onPolicyActions?.(policy.actions);
 
   const evaluation = EvaluationSchema.safeParse({
     sessionId: record.id,
     goalAchieved: parsed.data.goalAchieved,
     summary: parsed.data.summary,
-    findings: kept,
+    findings: policy.findings,
     facts,
+    policyActions: policy.actions,
   });
 
   if (!evaluation.success) return err('The assembled evaluation did not validate.');

@@ -36,7 +36,14 @@ const env: Env = {
 
 const common = { reasoning: 'r', expectation: 'e' };
 
-/** Stands in for the model's evaluation; the facts are still computed by us. */
+/**
+ * Stands in for the model's evaluation. The facts, the evidence ledger and the
+ * policy pass are all still real; only the judgment is faked.
+ *
+ * The second finding cites steps that never happened, so the policy pass must
+ * discard it. The third rests only on our own destructive-action block, so it
+ * must be reclassified away from PRODUCT_ISSUE.
+ */
 const evaluatorClient: LlmClient = {
   async completeJson() {
     return ok({
@@ -44,18 +51,30 @@ const evaluatorClient: LlmClient = {
       summary: 'The customer signed up and created an invoice, after hunting for "Billing".',
       findings: [
         {
-          title: 'Invoices live under a nav item called "Billing"',
-          description: 'The customer expected "Invoices" and had to guess.',
-          attribution: 'PRODUCT_FRICTION',
+          finding: 'Invoices live under a nav item called "Billing"',
+          classification: 'PRODUCT_ISSUE',
           severity: 'medium',
-          stepRefs: [0],
+          evidence: 'The page listed a link named "Billing" and none named "Invoices".',
+          evidenceType: 'PAGE_CONTENT',
+          confidence: 'medium',
+          affectedPersona: 'Sam, a small business owner',
+          supportingSteps: [0],
+          evidenceRefs: ['f1'],
+          alternativeExplanation: 'Billing may be the customer’s own expected term in this industry.',
+          recommendation: 'Name the nav item after the task, or mention invoices in it.',
         },
         {
-          title: 'A finding about a step that never happened',
-          description: 'This one cites evidence that does not exist.',
-          attribution: 'PRODUCT_FRICTION',
+          finding: 'A finding about a step that never happened',
+          classification: 'PRODUCT_ISSUE',
           severity: 'high',
-          stepRefs: [900, 901],
+          evidence: 'This one cites evidence that does not exist.',
+          evidenceType: 'PAGE_CONTENT',
+          confidence: 'high',
+          affectedPersona: 'Sam, a small business owner',
+          supportingSteps: [900, 901],
+          evidenceRefs: ['f1'],
+          alternativeExplanation: 'There is no alternative; the steps are invented.',
+          recommendation: 'Nothing to do.',
         },
       ],
     });
@@ -189,7 +208,7 @@ describe('runSimulation', () => {
     // 4. The hallucinated finding was discarded, not reported.
     expect(result.evaluation?.findings).toHaveLength(1);
     expect(result.rejectedFindings).toHaveLength(1);
-    expect(result.rejectedFindings[0]?.title).toContain('never happened');
+    expect(result.rejectedFindings[0]?.finding).toContain('never happened');
 
     // 5. It is all on disk, and re-readable without the browser.
     const db = openDb(join(dataDir, 'sessions.db'));

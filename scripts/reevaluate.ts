@@ -25,7 +25,7 @@ if (record === null) throw new Error('no such session');
 
 const result = await evaluateSession(record, {
   client: createLlmClient(env.value.openaiApiKey, env.value.openaiBaseUrl),
-  model: 'openai/gpt-oss-20b',
+  model: process.argv[3] ?? env.value.evaluatorModel,
   onRejectedFindings: (f) => console.log(`(discarded ${f.length} uncitable)`),
 });
 
