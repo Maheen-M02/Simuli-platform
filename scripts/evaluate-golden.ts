@@ -32,6 +32,7 @@ const { values } = parseArgs({
     model: { type: 'string' },
     scenario: { type: 'string' },
     json: { type: 'boolean' },
+    'max-tokens': { type: 'string' },
   },
 });
 
@@ -77,7 +78,13 @@ type Row = ScenarioPrediction & {
 const rows: Row[] = [];
 
 for (const scenario of scenarios) {
-  const result = await evaluateSession(scenario.record, { client, model });
+  const result = await evaluateSession(scenario.record, {
+    client,
+    model,
+    ...(values['max-tokens'] === undefined
+      ? {}
+      : { maxOutputTokens: Number(values['max-tokens']) }),
+  });
 
   if (!result.ok) {
     rows.push({
@@ -136,6 +143,9 @@ if (values.json === true) {
       process.stdout.write(`\n  ${row.scenarioId} (${row.category}) — expected ${row.expected}\n`);
       for (const produced of row.produced) process.stdout.write(`    produced: ${produced}\n`);
       if (row.produced.length === 0) process.stdout.write('    produced: nothing\n');
+      // Distinguishes a miss the model made from one our own policy imposed.
+      process.stdout.write(`    fact ids cited: ${row.citedFacts}\n`);
+      for (const reason of row.policyReasons) process.stdout.write(`    policy: ${reason}\n`);
     }
   }
 }

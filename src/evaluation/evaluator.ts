@@ -52,14 +52,14 @@ const EVALUATION_JSON_SCHEMA = {
         type: 'object',
         properties: {
           finding: { type: 'string', description: 'One sentence naming the problem.' },
-          classification: { enum: [...CLASSIFICATIONS] },
-          severity: { enum: [...SEVERITIES] },
+          classification: { type: 'string', enum: [...CLASSIFICATIONS] },
+          severity: { type: 'string', enum: [...SEVERITIES] },
           evidence: {
             type: 'string',
             description: 'Quote or closely paraphrase the observed facts you are citing.',
           },
-          evidenceType: { enum: [...EVIDENCE_TYPES] },
-          confidence: { enum: [...CONFIDENCES] },
+          evidenceType: { type: 'string', enum: [...EVIDENCE_TYPES] },
+          confidence: { type: 'string', enum: [...CONFIDENCES] },
           affectedPersona: { type: 'string' },
           supportingSteps: { type: 'array', items: { type: 'integer' } },
           evidenceRefs: {
@@ -163,6 +163,8 @@ export type EvaluateOptions = {
   readonly onRejectedFindings?: (rejected: readonly Finding[]) => void;
   /** Called with reclassifications the policy imposed on the model. */
   readonly onPolicyActions?: (actions: readonly PolicyAction[]) => void;
+  /** Cap on the reply, for a thin credit balance. Defaults to the client's. */
+  readonly maxOutputTokens?: number;
 };
 
 export async function evaluateSession(
@@ -180,6 +182,7 @@ export async function evaluateSession(
     jsonSchema: EVALUATION_JSON_SCHEMA as unknown as Record<string, unknown>,
     // Judgment should be stable: the same record twice should read the same way.
     temperature: 0.1,
+    ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens }),
   });
 
   if (!response.ok) return err(response.error);

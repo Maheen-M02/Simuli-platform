@@ -108,7 +108,11 @@ function variant(
   properties: Record<string, unknown>,
   description: string,
 ): Record<string, unknown> {
-  const all = { action: { const: name }, ...properties, ...shared };
+  // `type` is required on every property in OpenAI's strict mode, and a bare
+  // `const` has none — a single-value `enum` of type string is the portable way
+  // to pin the discriminant. NVIDIA accepted `const`; OpenAI rejects the whole
+  // request, so the stricter form is the one to write.
+  const all = { action: { type: 'string', enum: [name] }, ...properties, ...shared };
   return {
     type: 'object',
     description,
@@ -150,14 +154,23 @@ export const ACTION_JSON_SCHEMA = {
         variant('select', { ref: REF, value: { type: 'string' } }, 'Choose an option in a dropdown.'),
         variant(
           'scroll',
-          { direction: { enum: ['up', 'down'] }, amount: { enum: ['page', 'half'] } },
+          {
+            direction: { type: 'string', enum: ['up', 'down'] },
+            amount: { type: 'string', enum: ['page', 'half'] },
+          },
           'Scroll the page.',
         ),
-        variant('press_key', { key: { enum: [...PRESSABLE_KEYS] } }, 'Press a single key.'),
+        variant(
+          'press_key',
+          { key: { type: 'string', enum: [...PRESSABLE_KEYS] } },
+          'Press a single key.',
+        ),
         variant('go_back', {}, 'Go back to the previous page.'),
         variant(
           'wait',
-          { ms: { type: 'integer', minimum: 100, maximum: 5000 } },
+          // Numeric bounds are not part of the strict-mode subset. Zod is the
+          // authority on the range anyway; the description carries it to the model.
+          { ms: { type: 'integer', description: 'Between 100 and 5000.' } },
           'Wait for something in progress.',
         ),
         variant(
@@ -167,7 +180,7 @@ export const ACTION_JSON_SCHEMA = {
         ),
         variant(
           'fail',
-          { reason: { type: 'string' }, blocker: { enum: [...BLOCKER_KINDS] } },
+          { reason: { type: 'string' }, blocker: { type: 'string', enum: [...BLOCKER_KINDS] } },
           'Stop: something is genuinely blocking you.',
         ),
       ],

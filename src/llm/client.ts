@@ -32,6 +32,16 @@ export type JsonRequest = {
   /** Low by default: we want the persona's judgment, not novelty for its own sake. */
   readonly temperature?: number;
   readonly maxRetries?: number;
+  /**
+   * Cap on the reply. Always sent.
+   *
+   * Left unset, some endpoints reserve the model's entire context window for
+   * the completion — OpenRouter refuses the request outright on that basis, and
+   * a metered endpoint would instead simply let a runaway reply bill for it. A
+   * structured action or evaluation has a known rough size, so there is no
+   * reason to leave the ceiling open.
+   */
+  readonly maxOutputTokens?: number;
 };
 
 export type LlmClient = {
@@ -39,6 +49,12 @@ export type LlmClient = {
 };
 
 const DEFAULT_MAX_RETRIES = 2;
+
+/**
+ * Generous for one action or one evaluation, and far below any model's context.
+ * Callers that need more say so; nothing gets an open-ended budget.
+ */
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 
 /** Transient conditions are worth another go; a bad request never is. */
 function isRetryable(error: unknown): boolean {
@@ -94,6 +110,7 @@ export function createLlmClient(apiKey: string, options: ClientOptions = {}): Ll
           const response = await client.chat.completions.create({
             model: request.model,
             temperature: request.temperature ?? 0.4,
+            max_tokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
             // Not part of the OpenAI API. An aggregator reads it and declines to
             // route us to a provider that cannot honour the schema we sent —
             // which is the difference between a loud failure and a silent
